@@ -1,0 +1,683 @@
+= Руководство по настройке OpenCode
+:doctype: book
+:toc:
+:toclevels: 3
+:toc-title: Содержание
+:source-highlighter: rouge
+:listing-caption: Листинг
+
+== Введение
+
+Это руководство содержит результаты исследования правильной настройки OpenCode - системы для управления AI-агентами. В документе описаны структура конфигурации, best practices, распространённые ошибки и чек-лист для проверки.
+
+---
+
+== Обзор структуры конфигурации OpenCode
+
+OpenCode использует **гибридную конфигурацию**: основной файл `opencode.json` (JSON/JSONC) в корне проекта или глобально, плюс директорию `.opencode/` для расширяемых компонентов.
+
+=== Иерархия загрузки конфигураций
+
+Конфигурации загружаются в следующем порядке (с наивысшим приоритетом в конце):
+
+1. Удалённая (.well-known/opencode от провайдера)
+2. Глобальная (`~/.config/opencode/opencode.json`)
+3. Пользовательская (OPENCODE_CONFIG env)
+4. *Проектная* (`opencode.json` в корне проекта или Git-репо)
+5. `.opencode/` (agents/, commands/, plugins/, skills/, tools/, themes/)
+6. Встроенная (OPENCODE_CONFIG_CONTENT env)
+
+**Важно:** Конфиги сливаются (merge), более поздние переопределяют ранние. `.opencode/` используется для Markdown-файлов агентов и навыков.
+
+Схема валидации JSON: https://opencode.ai/config.json — обеспечивает автодополнение в IDE.
+
+---
+
+== Детальное описание секций конфигурации
+
+=== config/ (opencode.json)
+
+**Расположение:** Корень проекта или `~/.config/opencode/`
+
+**Формат:** JSON или JSONC (с комментариями)
+
+Основные секции файла:
+
+[source,json]
+----
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "anthropic/claude-sonnet-4-5",
+  "tui": {...},
+  "server": {...},
+  "tools": {...},
+  "models": {...},
+  "theme": "dark",
+  "agent": {...},
+  "default_agent": "plan",
+  "share": {...},
+  "command": {...},
+  "keybinds": {...},
+  "autoupdate": {...},
+  "formatter": {...},
+  "permission": {...},
+  "compaction": {...},
+  "watcher": {...},
+  "mcp": {...},
+  "plugin": {...},
+  "instructions": ["AGENTS.md"],
+  "disabled_providers": [...]
+}
+----
+
+**Переменные окружения:**
+- `{env:VAR}` — для секретов из переменных окружения
+- `{file:path}` — для чтения из файлов
+
+**Примеры секций:**
+
+[source,json]
+----
+{
+  "model": "anthropic/claude-sonnet-4-5",
+  "permission": {
+    "edit": "ask",
+    "bash": "ask",
+    "skill": {"*": "allow"}
+  },
+  "instructions": ["AGENTS.md", ".cursor/rules/*.md"]
+}
+----
+
+---
+
+=== rules/ (Правила проекта)
+
+**Файлы:**
+- `AGENTS.md` в корне проекта (проектные правила)
+- `~/.config/opencode/AGENTS.md` (глобальные правила)
+- Совместимость с `CLAUDE.md` (поддерживается)
+
+**Заполнение:** Markdown с описанием проекта, структуры, стандартов кода.
+
+[source,markdown]
+----
+# Project Rules
+
+## Проект
+MEPHI Python Programming Fundamentals course.
+
+## Структура
+src/
+├── lectures/
+└── labs/
+
+## Стандарты кода
+- Python 3.10+
+- PEP 8 стиль
+- Type hints для всех функций
+----
+
+**Генерация:** Команда `/init` генерирует AGENTS.md автоматически.
+
+**Приоритет:** Проект > Глобальный > Claude-совместимость.
+
+**Дополнения:** Можно подключить другие файлы через секцию `instructions` в `opencode.json`:
+
+[source,json]
+----
+{
+  "instructions": ["AGENTS.md", ".cursor/rules/*.md"]
+}
+----
+
+---
+
+=== agents/ (.opencode/agents/)
+
+**Файлы:** Markdown-файлы или JSON в `opencode.json > agent`.
+
+**Формат Markdown:** YAML-frontmatter + Markdown content
+
+[source,markdown]
+----
+---
+name: code-reviewer
+description: Reviews code for quality and security
+mode: subagent
+model: anthropic/claude-sonnet-4-5
+tools:
+  write: false
+permission:
+  edit: deny
+  bash: ask
+temperature: 0.2
+steps:
+  - analyze
+  - review
+  - suggest
+color: "#FF5733"
+---
+
+Инструкции для агента по ревью кода...
+
+---
+
+## Роль
+
+Вы эксперт по анализу кода. Проверяйте:
+- Безопасность
+- Производительность
+- Соответствие стандартам
+----
+
+**Поля YAML-frontmatter:**
+
+[cols="1,2"]
+|===
+|Поле |Описание
+|`name` |Имя агента (kebab-case)
+|`description` |Описание роли
+|`mode` |`primary` или `subagent`
+|`model` |Модель для агента
+|`tools` |Разрешённые инструменты
+|`permission` |Права доступа
+|`temperature` |Температура модели (0-2)
+|`steps` |Пошаговый workflow
+|`color` |Цвет в UI (hex)
+|===
+
+**Типы агентов:**
+
+* **Primary (Первичный):**
+  - Для основных задач
+  - Переключаются через Tab в UI
+  - Низкая температура (temp=0.1)
+  - Примеры: Build, Plan
+
+* **Subagent (Подагент):**
+  - Для специализированных подзадач
+  - Вызываются через @упоминание (@code-reviewer)
+  - Может иметь свои инструменты и права
+  - Примеры: General, Explore
+
+---
+
+=== skills/ (.opencode/skills/)
+
+**Структура директории:**
+
+----
+.opencode/skills/
+└── skill-name/
+    ├── SKILL.md           # Основной файл (YAML + Markdown)
+    ├── scripts/           # Вспомогательные скрипты
+    ├── references/        # Дополнительная документация
+    └── assets/            # Изображения, файлы
+----
+
+**SKILL.md формат:**
+
+[source,markdown]
+----
+---
+name: git-release
+description: Create releases and changelogs from PRs
+license: MIT
+compatibility:
+  opencode: ">=1.0.0"
+metadata:
+  author: YourName
+  version: 1.0.0
+  tags: [git, release, automation]
+allowed-tools:
+  - bash
+  - write
+  - read
+---
+
+## Описание навыка
+
+Этот навык помогает создавать релизы и changelog-и на основе PR-ов.
+
+---
+
+## What I do
+
+- Analysing PR titles and descriptions
+- Drafting release notes
+- Proposing version bump (semantic versioning)
+- Creating tags
+
+---
+
+## Usage
+
+```json
+{
+  "tool": "skill",
+  "name": "git-release"
+}
+```
+----
+
+**Требования к полям:**
+
+[cols="1,1,2"]
+|===
+|Поле |Обязательно |Ограничения
+|`name` |Да |kebab-case, 1-64 символа (a-z0-9-)
+|`description` |Да |1-1024 символа
+|`license` |Нет |SPDX identifier
+|`compatibility` |Нет |версии совместимости
+|`metadata` |Нет |произвольные данные
+|`allowed-tools` |Нет |список разрешённых инструментов
+|===
+
+**Размер файла:** SKILL.md должен быть < 500 строк. Если больше — разделите на references/.
+
+**Загрузка навыка:** Используйте в коде агента:
+
+[source,json]
+----
+{
+  "tool": "skill",
+  "name": "skill-name"
+}
+----
+
+**Разрешения:** В `opencode.json` добавьте:
+
+[source,json]
+----
+{
+  "permission": {
+    "skill": {"*": "allow"}
+  }
+}
+----
+
+---
+
+=== Спецификация AgentSkills.io
+
+**Стандарты:** Полная спецификация: https://agentskills.io/specification
+
+**Основные требования:**
+
+1. **Директория:** `skill-name/SKILL.md` (имя директории = имя навыка)
+2. **Формат:** YAML метаданные + Markdown инструкции
+3. **Ограничения:**
+   - `name`: lowercase a-z0-9-, 1-64 символа
+   - `description`: < 1024 символа
+4. **Опционально:**
+   - `scripts/` — вспомогательные скрипты
+   - `references/` — дополнительная документация
+   - `assets/` — изображения, файлы
+
+**Best practices:**
+
+* Progressive disclosure: метаданные → инструкции → ресурсы
+* Короткие описания с ключевыми словами
+* Валидация: `skills-ref validate` (если доступно)
+* Совместимость: OpenCode поддерживает полностью
+
+---
+
+== Примеры правильной конфигурации
+
+=== Полный opencode.json
+
+[source,json]
+----
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "anthropic/claude-sonnet-4-5",
+  "default_agent": "plan",
+  "permission": {
+    "edit": "ask",
+    "bash": "ask",
+    "skill": {"*": "allow"}
+  },
+  "instructions": ["AGENTS.md", ".cursor/rules/*.md"],
+  "agent": {
+    "review": {
+      "description": "Reviews code for quality and security",
+      "mode": "subagent",
+      "model": "anthropic/claude-sonnet-4-5",
+      "tools": {
+        "write": false
+      },
+      "permission": {
+        "edit": "deny",
+        "bash": "ask"
+      },
+      "temperature": 0.2
+    },
+    "build": {
+      "description": "Builds and tests the project",
+      "mode": "primary",
+      "temperature": 0.1
+    }
+  },
+  "disabled_providers": []
+}
+----
+
+=== Пример агента (.opencode/agents/review.md)
+
+[source,markdown]
+----
+---
+name: code-reviewer
+description: Reviews code for quality and security
+mode: subagent
+model: anthropic/claude-sonnet-4-5
+tools:
+  write: false
+permission:
+  edit: deny
+  bash: ask
+temperature: 0.2
+color: "#FF5733"
+---
+
+## Ваша роль
+
+Вы эксперт по качеству кода. Выполняйте:
+
+1. **Анализ безопасности**
+   - SQL injection, XSS, CSRF
+   - Обработка секретов
+   - Валидация входных данных
+
+2. **Проверка производительности**
+   - O-нотация алгоритмов
+   - Неэффективные циклы
+   - Memory leaks
+
+3. **Соответствие стандартам**
+   - PEP 8 (Python)
+   - TypeScript strict mode
+   - ESLint правила
+
+---
+
+## Формат отчёта
+
+```markdown
+## 🔍 Code Review
+
+### ✅ Strengths
+- Strength 1
+- Strength 2
+
+### ❌ Issues
+**Critical:** Issue description
+**Medium:** Issue description
+
+### 💡 Suggestions
+1. Suggestion 1
+2. Suggestion 2
+```
+----
+
+=== Пример навыка (.opencode/skills/git-release/SKILL.md)
+
+[source,markdown]
+----
+---
+name: git-release
+description: Create releases and changelogs from PRs
+license: MIT
+compatibility:
+  opencode: ">=1.0.0"
+metadata:
+  author: YourName
+  version: 1.0.0
+  tags: [git, release, automation]
+allowed-tools:
+  - bash
+  - write
+  - read
+---
+
+## Что я делаю
+
+Этот навык автоматизирует создание релизов:
+
+1. **Анализ PR-ов**
+   - Читает заголовки и описания PR-ов
+   - Классифицирует изменения (feature, bugfix, breaking)
+
+2. **Создание changelog-а**
+   - Генерирует структурированный список изменений
+   - Следует Conventional Commits
+
+3. **Версионирование**
+   - Предлагает версию bump (semver)
+   - Создаёт git tag
+
+---
+
+## Usage
+
+В коде агента:
+
+```json
+{
+  "tool": "skill",
+  "name": "git-release"
+}
+```
+
+---
+
+## Workflow
+
+1. Get merged PRs since last tag
+2. Classify by type (feat, fix, breaking, docs)
+3. Draft release notes
+4. Suggest version bump
+5. Create tag if approved
+----
+
+=== Пример AGENTS.md
+
+[source,markdown]
+----
+# Project Rules
+
+MEPHI Python Programming Fundamentals course.
+
+## Проект
+
+Образовательный репозиторий с лекциями и лабораторными работами.
+
+## Структура
+
+----
+src/
+├── lectures/
+│   └── lec-XX/
+│       ├── text.adoc
+│       └── examples/
+└── labs/
+    └── lab-XX/
+        ├── text.adoc
+        └── starter/
+----
+
+## Стандарты кода
+
+### Python
+- Python 3.10+
+- PEP 8 стиль
+- Type hints для всех функций
+- snake_case для функций и переменных
+- PascalCase для классов
+
+### AsciiDoc
+- Синтаксис: https://asciidoctor.org/docs/asciidoc-writers-guide/
+- Валидация: `scripts/asciidoctor-validate.sh <file>`
+
+## Build/Validate
+
+```bash
+# AsciiDoc
+scripts/asciidoctor-validate.sh src/lectures/lec-01/text.adoc
+scripts/asciidoctor-build-html-book.sh
+
+# Python
+python src/labs/lab-01/starter/main.py
+```
+
+## Permissions
+
+- Писать код только в `src/`
+- Не трогать `.opencode/` (управляется отдельно)
+- AGENTS.md — основной источник правил
+----
+
+---
+
+== Best Practices и рекомендации
+
+=== Merge-aware конфигурация
+
+* Используйте проектные опции для переопределения глобальных
+* Тестируйте порядок слияния: глобал + проект
+* Проверяйте финальную конфигурацию через UI
+
+=== AGENTS.md
+
+* Коммитьте в Git — это часть проекта
+* Генерируйте через `/init` для начальной структуры
+* Содержит описание проекта, структуры, стандартов кода
+* Может включать ссылки на другие файлы правил
+
+=== Agents (агенты)
+
+* **Primary агенты:**
+  - Для основных задач (Build, Plan)
+  - Переключаются через Tab
+  - Низкая температура (temp=0.1)
+* **Subagent-ы:**
+  - Для специализированных подзадач
+  - Вызываются через @упоминание
+  - Могут иметь свои инструменты и права
+  - Примеры: @code-reviewer, @general, @explore
+
+=== Skills (навыки)
+
+* Короткие описания с ключевыми словами
+* SKILL.md < 500 строк (если больше → references/)
+* Progressive disclosure: метаданные → инструкции → ресурсы
+* Следуйте спецификации AgentSkills.io
+* Валидация имени: kebab-case, 1-64 символа
+
+=== Permissions (разрешения)
+
+* **Plan mode:** bash/edit "ask" (подтверждение перед действием)
+* **Build mode:** более перmissive
+* **Skills:** `permission.skill: {"*": "allow"}`
+* **Glob patterns:** `*`: "deny" должен быть последним в списке
+
+=== Инструкции
+
+* Используйте glob/URL в `instructions` секции
+* Ссылки в AGENTS.md как `@file.md`
+* Избегайте дубликатов в списке инструкций
+
+=== Безопасность
+
+* `disabled_providers` — отключите ненужные провайдеры
+* `permission.deny` для опасных операций в продакшене
+* Используйте переменные окружения `{env:VAR}` для секретов
+
+=== Валидация
+
+* Используйте схему JSON для автодополнения в IDE
+* `opencode agent create` для создания агентов
+* Проверяйте валидность YAML-frontmatter в агентах/навыках
+
+---
+
+== Частые ошибки и как их избежать
+
+[cols="1,1,1"]
+|===
+|Ошибка |Причина |Решение
+|Конфиг не применяется |Неправильный приоритет загрузки |Проверьте порядок: проект > глобальный. Используйте `OPENCODE_CONFIG` для отладки
+
+|Skills не видны |Invalid name/description |Kebab-case для имени; валидация по spec. Проверьте совместимость версии OpenCode
+
+|Agents не переключаются |mode=subagent в primary агенте |Primary только для Tab-переключения. Subagent — только для @упоминаний
+
+|Merge конфликты |Нет понимания слияния конфигов |Тестируйте комбинацию глобал + проект. Проверяйте финальный результат в UI
+
+|Длинный контекст |Большой SKILL.md |Разделите на references/. Каждый файл < 500 строк
+
+|Нет прав на действия |Tools/permission неправильно настроены |"ask"/"allow" для нужных операций; glob `*`: "deny" должен быть последним
+
+|Claude-совместимость не отключается |Конфликт AGENTS.md и CLAUDE.md |Используйте `OPENCODE_DISABLE_CLAUDE_CODE=1` если нужно отключить
+|===
+
+---
+
+== Чек-лист для проверки конфигурации
+
+=== Базовый чек-лист
+
+* [ ] `opencode.json` валиден по схеме (IDE check, https://opencode.ai/config.json)
+* [ ] `.opencode/agents/*.md`: YAML-frontmatter с name/description/mode
+* [ ] `.opencode/skills/*/SKILL.md`: keab-case имя, description <1024, соответствует директории
+* [ ] AGENTS.md: коммит в Git, описывает структуру проекта и стандарты кода
+* [ ] Permissions: bash/edit "ask" в Plan mode; skills "allow"
+* [ ] Instructions: glob patterns без дубликатов
+* [ ] Тестирование: `opencode` запускается, Tab-агенты переключаются, @subagent работает, `/init` генерирует AGENTS.md
+* [ ] Environment: Нет конфликтов OPENCODE_* переменных
+
+=== Дополнительная проверка
+
+* [ ] Все агенты имеют корректный `mode` (primary или subagent)
+* [ ] Все навыки соответствуют спецификации AgentSkills.io
+* [ ] Используются переменные окружения для секретов `{env:VAR}`
+* [ ] Конфигурация использует merge-aware подход (глобал + проект)
+* [ ] Отключены ненужные провайдеры (`disabled_providers`)
+* [ ] Документация навыков < 500 строк или разделена на references/
+
+---
+
+== Рекомендуемый подход к настройке
+
+1. **Инициализация:** Запустите `/init` для генерации AGENTS.md
+2. **Базовая конфигурация:** Создайте `opencode.json` с моделями и permissions
+3. **Custom agents:** Добавьте `.opencode/agents/` для кастомизации
+4. **Custom skills:** Добавьте `.opencode/skills/` для расширения функционала
+5. **Валидация:** Проверьте соответствие spec для skills
+6. **Commit:** Закомитьте всё в Git (кроме секретов)
+7. **Test:** Протестируйте все агенты и навыки
+
+---
+
+== Ссылки
+
+* [Основная документация OpenCode](https://opencode.ai/docs/ru)
+* [Конфигурация](https://opencode.ai/docs/ru/config/)
+* [Правила](https://opencode.ai/docs/ru/rules/)
+* [Агенты](https://opencode.ai/docs/ru/agents/)
+* [Навыки](https://opencode.ai/docs/ru/skills/)
+* [Спецификация AgentSkills.io](https://agentskills.io/specification)
+
+---
+
+== Заключение
+
+Это руководство содержит основную информацию по правильной настройке OpenCode. Следуйте best practices, используйте чек-лист для проверки и избегайте распространённых ошибок.
+
+Для более глубокого понимания рекомендуется обратиться к официальной документации.
+
+---
+
+*Документ создан на основе исследования от 19.02.2026*
