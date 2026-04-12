@@ -115,7 +115,10 @@ class Config:
     codex_stall_timeout_ms: int
 
     # Server (optional)
-    server_port: Optional[int]
+    server_port: Optional[int] = None
+
+    # Agent backend selection
+    agent_backend: str = "codex"  # Default backend
 
 
 def load_config(workflow: Workflow) -> Config:
@@ -227,4 +230,6 @@ def load_config(workflow: Workflow) -> Config:
         codex_stall_timeout_ms=get("codex.stall_timeout_ms", 300000),
         # Server
         server_port=get("server.port"),
+        # Agent backend
+        agent_backend=get("agent_backend", "codex"),
     )
