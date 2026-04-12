@@ -1,10 +1,16 @@
 """Tracker factory for creating adapter instances."""
 
-import os
-from typing import Any, Dict, Optional, Type
+import logging
+import warnings
+from typing import Any, Dict, Type
 
 from .base import TrackerClient
-from .registry import get_tracker_registry
+from .registry import get_tracker_registry, AdapterInfo
+
+logger = logging.getLogger(__name__)
+
+
+# Error classes
 
 
 class TrackerFactoryError(Exception):
@@ -21,6 +27,12 @@ class TrackerNotRegisteredError(TrackerFactoryError):
 
 class TrackerConfigError(TrackerFactoryError):
     """Exception raised when tracker configuration is invalid."""
+
+    pass
+
+
+class TrackerDependencyError(TrackerFactoryError):
+    """Exception raised when adapter dependencies are missing."""
 
     pass
 
@@ -67,11 +79,14 @@ class TrackerApiRateLimitError(TrackerAPIError):
     pass
 
 
+# Factory class
+
+
 class TrackerFactory:
     """Factory for creating tracker adapter instances.
 
     Creates tracker adapters based on configuration, handling
-    validation and instantiation.
+    plugin discovery and generic instantiation.
     """
 
     @staticmethod
@@ -87,131 +102,124 @@ class TrackerFactory:
         Raises:
             TrackerNotRegisteredError: If tracker kind is not registered
             TrackerConfigError: If configuration is invalid
+            TrackerDependencyError: If adapter dependencies are missing
         """
         kind = config.tracker_kind
         registry = get_tracker_registry()
 
-        # Get adapter class
-        adapter_class = registry.get_adapter(kind)
-        if adapter_class is None:
-            available = registry.list_adapters()
+        # Get adapter info from registry
+        adapter_info = registry.get_adapter(kind)
+        if adapter_info is None:
+            available = list(registry.list_available().keys())
             raise TrackerNotRegisteredError(
                 f"Tracker kind '{kind}' is not registered. "
-                f"Available trackers: {available}"
+                f"Available trackers: {', '.join(available)}\n"
+                f"To install a tracker plugin, run: pip install symphony-{kind}\n"
+                f"For custom trackers, see: https://docs.symphony.dev/plugins/trackers"
             )
 
-        # Validate configuration
-        TrackerFactory._validate_config(kind, config)
+        adapter_class = adapter_info.adapter_class
 
-        # Instantiate adapter
-        return TrackerFactory._instantiate_adapter(adapter_class, config)
+        # Check for deprecation warnings
+        if adapter_info.metadata.get("deprecated"):
+            warnings.warn(
+                f"Using built-in '{kind}' adapter is deprecated. "
+                f"Install plugin package: pip install symphony-{kind}",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        # Build config dictionary for adapter
+        config_dict = TrackerFactory._build_config_dict(config, kind)
+
+        # Instantiate adapter (adapter validates its own config)
+        try:
+            return adapter_class(**config_dict)
+        except (TypeError, ValueError) as e:
+            raise TrackerConfigError(
+                f"Failed to instantiate '{kind}' adapter configuration: {e}"
+            ) from e
+        except Exception as e:
+            # Don't wrap API-related exceptions
+            if isinstance(
+                e, (TrackerAPIError, TrackerApiRequestError, TrackerApiStatusError)
+            ):
+                raise
+            raise TrackerConfigError(
+                f"Failed to instantiate '{kind}' adapter: {e}"
+            ) from e
 
     @staticmethod
-    def _validate_config(kind: str, config: Any) -> None:
-        """Validate tracker configuration.
+    def _build_config_dict(config: Any, kind: str) -> Dict[str, Any]:
+        """Build configuration dictionary for adapter instantiation.
+
+        Maps global config keys to adapter-specific keys.
+        Different tracker kinds may need different parameter names.
+
+        Args:
+            config: Configuration object
+            kind: Tracker kind identifier
+
+        Returns:
+            Configuration dictionary for adapter constructor
+        """
+        # Base config that all adapters can use
+        config_dict: Dict[str, Any] = {
+            "api_key": getattr(config, "tracker_api_key", None),
+            "endpoint": getattr(config, "tracker_endpoint", None),
+            "username": getattr(config, "tracker_username", None),
+            "timeout": getattr(config, "tracker_timeout", 30),
+            "active_states": getattr(config, "tracker_active_states", None),
+        }
+
+        # Tracker-specific mappings
+        if kind == "linear":
+            config_dict["project_slug"] = getattr(config, "tracker_project_slug", None)
+        elif kind == "jira":
+            config_dict["project_key"] = getattr(config, "tracker_project_slug", None)
+        else:
+            # Generic: try common parameter names
+            config_dict["project_slug"] = getattr(config, "tracker_project_slug", None)
+            config_dict["project_key"] = getattr(config, "tracker_project_slug", None)
+
+        # Remove None values
+        config_dict = {k: v for k, v in config_dict.items() if v is not None}
+
+        # Validate required parameters
+        TrackerFactory._validate_config(kind, config_dict)
+
+        return config_dict
+
+    @staticmethod
+    def _validate_config(kind: str, config_dict: Dict[str, Any]) -> None:
+        """Validate required configuration parameters.
 
         Args:
             kind: Tracker kind identifier
-            config: Configuration object
+            config_dict: Configuration dictionary
 
         Raises:
-            TrackerConfigError: If configuration is invalid
+            TrackerConfigError: If required parameters are missing
         """
         if kind == "linear":
-            TrackerFactory._validate_linear_config(config)
+            missing = []
+            if "api_key" not in config_dict:
+                missing.append("api_key")
+            if "project_slug" not in config_dict:
+                missing.append("project_slug")
+            if missing:
+                raise TrackerConfigError(
+                    f"Linear adapter requires missing configuration parameters: {', '.join(missing)}. "
+                    f"Please provide tracker_api_key and tracker_project_slug in configuration."
+                )
         elif kind == "jira":
-            TrackerFactory._validate_jira_config(config)
-        # Add other trackers here
-
-    @staticmethod
-    def _validate_linear_config(config: Any) -> None:
-        """Validate Linear tracker configuration.
-
-        Args:
-            config: Configuration object
-
-        Raises:
-            TrackerConfigError: If configuration is invalid
-        """
-        # Check API key (required)
-        api_key = config.tracker_api_key
-        if not api_key:
-            raise TrackerConfigError(
-                "Linear tracker requires 'tracker_api_key' in config or "
-                "LINEAR_API_KEY environment variable"
-            )
-
-        # Check project slug (required)
-        project_slug = config.tracker_project_slug
-        if not project_slug:
-            raise TrackerConfigError(
-                "Linear tracker requires 'tracker_project_slug' in config"
-            )
-
-    @staticmethod
-    def _validate_jira_config(config: Any) -> None:
-        """Validate Jira tracker configuration.
-
-        Args:
-            config: Configuration object
-
-        Raises:
-            TrackerConfigError: If configuration is invalid
-        """
-        # Check API token
-        api_key = config.tracker_api_key
-        if not api_key:
-            raise TrackerConfigError(
-                "Jira tracker requires 'tracker_api_key' in config or "
-                "JIRA_API_TOKEN environment variable"
-            )
-
-        # Check endpoint
-        endpoint = config.tracker_endpoint
-        if not endpoint:
-            raise TrackerConfigError(
-                "Jira tracker requires 'tracker_endpoint' in config"
-            )
-
-        # Check username for basic auth
-        username = config.tracker_username
-        if not username:
-            raise TrackerConfigError(
-                "Jira tracker requires 'tracker_username' in config for basic auth"
-            )
-
-    @staticmethod
-    def _instantiate_adapter(
-        adapter_class: Type[TrackerClient], config: Any
-    ) -> TrackerClient:
-        """Instantiate a tracker adapter with configuration.
-
-        Args:
-            adapter_class: TrackerClient subclass to instantiate
-            config: Configuration object
-
-        Returns:
-            TrackerClient instance
-        """
-        kind = config.tracker_kind
-
-        if kind == "linear":
-            return adapter_class(
-                api_key=config.tracker_api_key,
-                project_slug=config.tracker_project_slug,
-            )
-        elif kind == "jira":
-            return adapter_class(
-                api_key=config.tracker_api_key,
-                endpoint=config.tracker_endpoint,
-                project_key=config.tracker_project_slug or "",
-                username=config.tracker_username or "",
-            )
-        else:
-            # Fallback for unknown trackers - pass all config as kwargs
-            return adapter_class(
-                api_key=config.tracker_api_key,
-                endpoint=config.tracker_endpoint,
-                project_slug=config.tracker_project_slug,
-                username=config.tracker_username,
-            )
+            missing = []
+            if "api_key" not in config_dict:
+                missing.append("api_key")
+            if "endpoint" not in config_dict:
+                missing.append("endpoint")
+            if missing:
+                raise TrackerConfigError(
+                    f"Jira adapter requires missing configuration parameters: {', '.join(missing)}. "
+                    f"Please provide tracker_api_key and tracker_endpoint in configuration."
+                )

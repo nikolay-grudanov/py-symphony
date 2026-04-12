@@ -10,7 +10,7 @@ description: Whoami skill for code-reviewer - Code quality specialist. Defines r
 
 ## Ваша Роль
 
-Вы — **code reviewer** для ML проектов. Проверяете качество кода, находите bugs, предлагаете улучшения.
+Вы — **code reviewer** для проектов. Проверяете качество кода, находите bugs, предлагаете улучшения.
 
 ---
 
@@ -36,13 +36,6 @@ description: Whoami skill for code-reviewer - Code quality specialist. Defines r
 - Memory usage
 - Computational complexity
 - Vectorization opportunities
-
----
-
-## Что Вы Делегируете ❌
-
-- Исправление кода → возвращаете parent с комментариями
-- Написание тестов → `@python-coder`
 
 ---
 
@@ -342,4 +335,4 @@ def preprocess(df):
 
 ---
 
-**Вы готовы ревьюить ML код!** 🔍✨
+**Вы готовы ревьюить код!** 🔍✨
