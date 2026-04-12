@@ -1,0 +1,331 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://symphony.dev/schemas/issue-context.schema.json",
+  "title": "IssueContext",
+  "description": "Represents context from an issue tracker (e.g., Jira, Linear, GitHub Issues) that provides detailed information about a task, bug, or feature request being tracked.",
+  "type": "object",
+  "required": ["id", "identifier", "title", "state", "priority"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the issue in the tracker system",
+      "examples": ["ISS-001", "7a8b9c0d1e2f3", "123456"]
+    },
+    "identifier": {
+      "type": "string",
+      "description": "Human-readable identifier or ticket number (e.g., PROJ-123)",
+      "pattern": "^[A-Z]+-\\d+$",
+      "examples": ["PROJ-123", "FEAT-456", "BUG-789"]
+    },
+    "title": {
+      "type": "string",
+      "description": "Title or summary of the issue",
+      "minLength": 1,
+      "maxLength": 200,
+      "examples": ["Implement user authentication", "Fix login page bug", "Add dark mode support"]
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description of the issue, including requirements, acceptance criteria, or reproduction steps",
+      "minLength": 0
+    },
+    "state": {
+      "type": "string",
+      "description": "Current state or status of the issue in the workflow",
+      "examples": ["backlog", "todo", "in_progress", "in_review", "done", "cancelled", "blocked"]
+    },
+    "priority": {
+      "type": "integer",
+      "description": "Priority level (higher values indicate higher priority)",
+      "minimum": 1,
+      "maximum": 10,
+      "examples": [1, 5, 10]
+    },
+    "labels": {
+      "type": "array",
+      "description": "Tags or labels categorizing the issue",
+      "items": {"type": "string"},
+      "uniqueItems": true,
+      "examples": [["bug", "high-priority"], ["feature", "enhancement"], ["documentation", "technical-debt"]]
+    },
+    "blocked_by": {
+      "type": "array",
+      "description": "List of issue identifiers that this issue is blocked by",
+      "items": {"type": "string"},
+      "uniqueItems": true,
+      "minItems": 0,
+      "examples": [["PROJ-100", "PROJ-101"], []]
+    },
+    "blocking": {
+      "type": "array",
+      "description": "List of issue identifiers that are blocked by this issue",
+      "items": {"type": "string"},
+      "uniqueItems": true,
+      "minItems": 0,
+      "examples": [["PROJ-200", "PROJ-201"], []]
+    },
+    "assignee": {
+      "type": "string",
+      "description": "User assigned to work on this issue",
+      "examples": ["user@example.com", "@username"]
+    },
+    "reporter": {
+      "type": "string",
+      "description": "User who reported or created the issue",
+      "examples": ["user@example.com", "@username"]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the issue was created",
+      "examples": ["2026-04-11T10:00:00Z"]
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the issue was last updated",
+      "examples": ["2026-04-11T14:30:00Z"]
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the issue is due",
+      "examples": ["2026-04-20T17:00:00Z"]
+    },
+    "resolution": {
+      "type": "object",
+      "description": "Resolution information when the issue has been resolved",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Type of resolution",
+          "enum": ["fixed", "wont_fix", "duplicate", "cannot_reproduce", "works_for_me", "invalid"],
+          "examples": ["fixed", "duplicate", "wont_fix"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of how the issue was resolved"
+        },
+        "resolved_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when the issue was resolved"
+        },
+        "resolved_by": {
+          "type": "string",
+          "description": "User who resolved the issue",
+          "examples": ["user@example.com", "@username"]
+        }
+      }
+    },
+    "comments": {
+      "type": "array",
+      "description": "Comments or discussion on the issue",
+      "items": {
+        "type": "object",
+        "description": "Individual comment with author, content, and timestamp",
+        "required": ["author", "content", "created_at"],
+        "properties": {
+          "id": {"type": "string", "description": "Unique identifier for the comment"},
+          "author": {"type": "string", "description": "User who made the comment"},
+          "content": {"type": "string", "description": "Comment content"},
+          "created_at": {"type": "string", "format": "date-time", "description": "Timestamp when comment was created"},
+          "updated_at": {"type": "string", "format": "date-time", "description": "Timestamp when comment was last edited"},
+          "internal": {"type": "boolean", "description": "Whether comment is internal only"}
+        }
+      },
+      "minItems": 0
+    },
+    "attachments": {
+      "type": "array",
+      "description": "Files or attachments linked to the issue",
+      "items": {
+        "type": "object",
+        "description": "Attachment with name, URL, and metadata",
+        "required": ["id", "name", "url"],
+        "properties": {
+          "id": {"type": "string", "description": "Unique identifier for the attachment"},
+          "name": {"type": "string", "description": "Name of the attachment file"},
+          "url": {"type": "string", "format": "uri", "description": "URL to access the attachment"},
+          "size_bytes": {"type": "integer", "description": "Size of the attachment in bytes"},
+          "content_type": {"type": "string", "description": "MIME type of the attachment"},
+          "uploaded_at": {"type": "string", "format": "date-time", "description": "Timestamp when attachment was uploaded"},
+          "uploaded_by": {"type": "string", "description": "User who uploaded the attachment"}
+        }
+      },
+      "minItems": 0
+    },
+    "links": {
+      "type": "array",
+      "description": "Links or references to other issues or resources",
+      "items": {
+        "type": "object",
+        "description": "Link with type and target",
+        "required": ["type", "target"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Type of link",
+            "enum": ["relates_to", "duplicates", "is_blocked_by", "blocks", "is_caused_by", "causes", "is_child_of", "is_parent_of"],
+            "examples": ["relates_to", "duplicates", "is_blocked_by"]
+          },
+          "target": {
+            "type": "string",
+            "description": "Issue identifier or URL being linked to"
+          },
+          "description": {"type": "string", "description": "Description of the link relationship"}
+        }
+      },
+      "minItems": 0
+    },
+    "sprint": {
+      "type": "object",
+      "description": "Sprint or iteration information if issue is assigned to a sprint",
+      "properties": {
+        "id": {"type": "string", "description": "Sprint identifier"},
+        "name": {"type": "string", "description": "Sprint name"},
+        "state": {
+          "type": "string",
+          "description": "Sprint state",
+          "enum": ["future", "active", "closed"]
+        },
+        "start_date": {"type": "string", "format": "date-time", "description": "Sprint start date"},
+        "end_date": {"type": "string", "format": "date-time", "description": "Sprint end date"}
+      }
+    },
+    "estimates": {
+      "type": "object",
+      "description": "Time and effort estimates for the issue",
+      "properties": {
+        "story_points": {"type": "integer", "description": "Story points estimate", "minimum": 0},
+        "hours_estimate": {"type": "number", "description": "Estimated hours to complete", "minimum": 0},
+        "remaining_hours": {"type": "number", "description": "Remaining hours to complete", "minimum": 0}
+      }
+    },
+    "source": {
+      "type": "object",
+      "description": "Information about the source system where this issue originates",
+      "properties": {
+        "system": {
+          "type": "string",
+          "description": "Name of the issue tracking system",
+          "enum": ["jira", "linear", "github", "gitlab", "azure-devops", "custom"],
+          "examples": ["jira", "linear", "github"]
+        },
+        "url": {"type": "string", "format": "uri", "description": "URL to view the issue in the source system"},
+        "project": {"type": "string", "description": "Project name or identifier in the source system"},
+        "external_id": {"type": "string", "description": "External ID in the source system"}
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional custom fields or metadata",
+      "additionalProperties": true
+    }
+  },
+  "examples": [
+    {
+      "id": "ISS-001",
+      "identifier": "PROJ-123",
+      "title": "Implement user authentication with OAuth2",
+      "description": "Implement secure user authentication using OAuth2 with support for Google and GitHub providers. This includes:\n\n- OAuth2 flow implementation\n- Token management and refresh\n- User profile synchronization\n- Session management\n\nAcceptance Criteria:\n1. Users can login with Google account\n2. Users can login with GitHub account\n3. Token refresh works seamlessly\n4. Logout properly clears session",
+      "state": "in_progress",
+      "priority": 8,
+      "labels": ["feature", "authentication", "oauth2", "security"],
+      "blocked_by": ["PROJ-100"],
+      "blocking": ["PROJ-200", "PROJ-201"],
+      "assignee": "developer@example.com",
+      "reporter": "pm@example.com",
+      "created_at": "2026-04-01T10:00:00Z",
+      "updated_at": "2026-04-11T14:30:00Z",
+      "due_date": "2026-04-20T17:00:00Z",
+      "comments": [
+        {
+          "id": "comment-001",
+          "author": "pm@example.com",
+          "content": "This is a high priority feature for the Q2 release.",
+          "created_at": "2026-04-01T10:05:00Z",
+          "internal": false
+        },
+        {
+          "id": "comment-002",
+          "author": "developer@example.com",
+          "content": "Started implementation of OAuth flow. Need to clarify token refresh mechanism.",
+          "created_at": "2026-04-10T09:00:00Z",
+          "internal": false
+        }
+      ],
+      "attachments": [
+        {
+          "id": "att-001",
+          "name": "oauth-flow-diagram.png",
+          "url": "https://attachments.example.com/oauth-flow-diagram.png",
+          "size_bytes": 102400,
+          "content_type": "image/png",
+          "uploaded_at": "2026-04-02T11:00:00Z",
+          "uploaded_by": "pm@example.com"
+        }
+      ],
+      "links": [
+        {
+          "type": "is_blocked_by",
+          "target": "PROJ-100",
+          "description": "Database schema changes needed first"
+        }
+      ],
+      "sprint": {
+        "id": "sprint-15",
+        "name": "Sprint 15 - Q2 Release",
+        "state": "active",
+        "start_date": "2026-04-01T09:00:00Z",
+        "end_date": "2026-04-15T18:00:00Z"
+      },
+      "estimates": {
+        "story_points": 8,
+        "hours_estimate": 32,
+        "remaining_hours": 16
+      },
+      "source": {
+        "system": "jira",
+        "url": "https://jira.example.com/browse/PROJ-123",
+        "project": "PROJECT-1",
+        "external_id": "100001"
+      }
+    },
+    {
+      "id": "ISS-002",
+      "identifier": "BUG-789",
+      "title": "Login page not loading on mobile Safari",
+      "description": "The login page fails to load on iOS Safari browser version 15+. Users report a blank screen.\n\nReproduction Steps:\n1. Open iOS Safari 15+ on iPhone\n2. Navigate to /login\n3. Page remains blank\n\nExpected: Login form should display\nActual: Blank screen\n\nBrowser Console Error:\n```\nUncaught ReferenceError: React is not defined\n```",
+      "state": "todo",
+      "priority": 10,
+      "labels": ["bug", "mobile", "safari", "critical"],
+      "blocked_by": [],
+      "blocking": [],
+      "assignee": "frontend-dev@example.com",
+      "reporter": "qa@example.com",
+      "created_at": "2026-04-11T08:00:00Z",
+      "updated_at": "2026-04-11T08:00:00Z",
+      "resolution": null,
+      "comments": [],
+      "attachments": [],
+      "links": [],
+      "sprint": {
+        "id": "sprint-15",
+        "name": "Sprint 15 - Q2 Release",
+        "state": "active"
+      },
+      "estimates": {
+        "story_points": 3,
+        "hours_estimate": 4,
+        "remaining_hours": 4
+      },
+      "source": {
+        "system": "github",
+        "url": "https://github.com/example/repo/issues/789",
+        "project": "repo",
+        "external_id": "789"
+      }
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+[project]
+name = "py-symphony"
+version = "0.1.0"
+description = "Symphony Service - orchestrate coding agents"
+requires-python = ">=3.10"
+dependencies = [
+    "aiohttp>=3.9.0",
+    "pyyaml>=6.0",
+    "structlog>=24.0.0",
+    "watchdog>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+]
+
+[project.scripts]
+symphony = "runtime.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["runtime*", "symphony*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --tb=short"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

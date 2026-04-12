@@ -1,0 +1,173 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://symphony.dev/schemas/handoff.schema.json",
+  "title": "Handoff",
+  "description": "Represents a handoff contract between agents, passing artifacts and context from one agent to another.",
+  "type": "object",
+  "required": ["from_agent", "to_agent", "artifacts", "context", "timestamp"],
+  "properties": {
+    "from_agent": {
+      "type": "string",
+      "description": "The agent initiating the handoff",
+      "enum": [
+        "build-orchestrator",
+        "platform-architect",
+        "backend-developer",
+        "frontend-developer",
+        "security-specialist",
+        "devops-engineer",
+        "test-engineer",
+        "data-engineer",
+        "ml-engineer"
+      ],
+      "examples": ["build-orchestrator", "platform-architect"]
+    },
+    "to_agent": {
+      "type": "string",
+      "description": "The target agent receiving the handoff",
+      "enum": [
+        "build-orchestrator",
+        "platform-architect",
+        "backend-developer",
+        "frontend-developer",
+        "security-specialist",
+        "devops-engineer",
+        "test-engineer",
+        "data-engineer",
+        "ml-engineer"
+      ],
+      "examples": ["platform-architect", "backend-developer"]
+    },
+    "artifacts": {
+      "type": "array",
+      "description": "List of artifacts being passed during the handoff",
+      "items": {
+        "$ref": "#/definitions/artifact"
+      },
+      "minItems": 0
+    },
+    "context": {
+      "type": "object",
+      "description": "Additional context information for the receiving agent",
+      "properties": {
+        "reason": {
+          "type": "string",
+          "description": "Reason for the handoff"
+        },
+        "dependencies": {
+          "type": "array",
+          "description": "List of dependencies required by the receiving agent",
+          "items": {"type": "string"}
+        },
+        "constraints": {
+          "type": "object",
+          "description": "Any constraints or limitations to consider"
+        },
+        "priority": {
+          "type": "string",
+          "description": "Priority level of this handoff",
+          "enum": ["low", "medium", "high", "critical"]
+        }
+      },
+      "additionalProperties": true
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the handoff was created",
+      "examples": ["2026-04-11T14:30:00Z"]
+    },
+    "correlation_id": {
+      "type": "string",
+      "description": "Unique identifier to track related handoffs across the workflow",
+      "examples": ["handoff-abc123-def456"]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional metadata about the handoff",
+      "properties": {
+        "workflow_id": {
+          "type": "string",
+          "description": "ID of the workflow this handoff belongs to"
+        },
+        "stage": {
+          "type": "string",
+          "description": "Build stage during which this handoff occurred"
+        },
+        "attempts": {
+          "type": "integer",
+          "description": "Number of attempts made for this handoff",
+          "minimum": 1
+        }
+      }
+    }
+  },
+  "definitions": {
+    "artifact": {
+      "type": "object",
+      "description": "Represents a single artifact passed during handoff",
+      "required": ["id", "type", "content"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the artifact"
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of the artifact",
+          "enum": ["adr", "sdd", "diagram", "config", "code", "test", "document", "data"]
+        },
+        "content": {
+          "description": "Artifact content (can be object, string, or array)",
+          "oneOf": [
+            {"type": "object"},
+            {"type": "string"},
+            {"type": "array"}
+          ]
+        },
+        "format": {
+          "type": "string",
+          "description": "Format of the artifact content",
+          "examples": ["json", "yaml", "markdown", "plain", "base64"]
+        },
+        "encoding": {
+          "type": "string",
+          "description": "Encoding if content is string",
+          "examples": ["utf-8", "base64"]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "from_agent": "build-orchestrator",
+      "to_agent": "platform-architect",
+      "artifacts": [
+        {
+          "id": "requirements-spec-001",
+          "type": "document",
+          "content": {
+            "title": "Requirements Specification",
+            "version": "1.0"
+          },
+          "format": "json"
+        }
+      ],
+      "context": {
+        "reason": "Architecture design phase requires analysis of requirements",
+        "priority": "high",
+        "constraints": {
+          "technology": "microservices",
+          "deployment": "cloud"
+        }
+      },
+      "timestamp": "2026-04-11T14:30:00Z",
+      "correlation_id": "handoff-abc123-def456",
+      "metadata": {
+        "workflow_id": "wf-001",
+        "stage": "architecture-design",
+        "attempts": 1
+      }
+    }
+  ]
+}

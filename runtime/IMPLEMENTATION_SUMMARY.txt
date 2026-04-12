@@ -1,0 +1,121 @@
+================================================================================
+SSH Worker Hosts Support - Implementation Summary
+================================================================================
+
+STATUS: ✅ COMPLETED
+
+Files Modified:
+1. runtime/symphony/config.py - Added worker configuration fields
+2. runtime/symphony/orchestrator.py - Added worker host selection logic
+
+Files Created:
+1. runtime/tests/test_worker_hosts.py - Comprehensive test suite (11 tests)
+2. runtime/tests/__init__.py - Test package init
+3. runtime/SSH_WORKER_HOSTS_IMPLEMENTATION.md - Detailed documentation
+
+================================================================================
+IMPLEMENTATION DETAILS
+================================================================================
+
+Config Changes (config.py):
+--------------------------
+✓ Added worker section to _DEFAULTS
+✓ Added worker_ssh_hosts: list[str] to Config dataclass
+✓ Added worker_max_concurrent_agents_per_host: int to Config dataclass
+✓ Updated load_config() to parse worker settings
+
+Orchestrator Changes (orchestrator.py):
+-------------------------------------
+✓ Added worker_host field to RunningEntry dataclass
+✓ Enhanced _can_dispatch() to check worker host slots
+✓ Added _worker_slots_available() helper
+✓ Added _select_worker_host() - selects least loaded host
+✓ Added _preferred_worker_host_available() - checks preferred host
+✓ Added _least_loaded_worker_host() - selects host with fewest agents
+✓ Added _running_worker_host_count() - counts agents on specific host
+✓ Added _worker_host_slots_available() - checks host slot availability
+✓ Updated _dispatch_issue() to assign worker host
+✓ Updated get_state_snapshot() to include worker_host info
+
+Test Coverage:
+-------------
+✓ 11 test cases covering all new functionality
+✓ All tests passing
+✓ Tests for: slot availability, host selection, capacity limits, dispatch logic
+
+Code Quality:
+------------
+✓ Python syntax validation passed
+✓ No flake8 linting issues
+✓ Type hints throughout
+✓ Comprehensive docstrings (Google style)
+✓ Follows existing code patterns
+
+================================================================================
+USAGE EXAMPLE
+================================================================================
+
+WORKFLOW.md configuration:
+--------------------------
+---
+worker:
+  ssh_hosts:
+    - host1.example.com
+    - host2.example.com:2222
+  max_concurrent_agents_per_host: 3
+---
+
+Behavior:
+--------
+✓ Agents distributed across SSH hosts based on load
+✓ Each host respects max concurrent agents limit
+✓ Least loaded host preferred for new agents
+✓ Global agent limit also enforced
+✓ Backward compatible (works without SSH hosts configured)
+
+================================================================================
+ALIGNMENT WITH ELIXIR REFERENCE
+================================================================================
+
+✓ _select_worker_host() matches Elixir's select_worker_host/2
+✓ _worker_slots_available() matches Elixir's worker_slots_available?/2
+✓ _least_loaded_worker_host() matches Elixir's least_loaded_worker_host/2
+✓ _running_worker_host_count() matches Elixir's running_worker_host_count/2
+✓ _worker_host_slots_available() matches Elixir's worker_host_slots_available?/2
+✓ Slot tracking in RunningEntry matches Elixir state structure
+
+Reference: elixir/lib/symphony_elixir/orchestrator.ex lines 973-1033
+
+================================================================================
+TEST RESULTS
+================================================================================
+
+All 11 tests passed:
+- test_worker_host_slots_available_empty
+- test_worker_host_slots_available_below_limit
+- test_worker_host_slots_available_at_limit
+- test_running_worker_host_count
+- test_least_loaded_worker_host
+- test_select_worker_host_empty_state
+- test_select_worker_host_least_loaded
+- test_select_worker_host_no_capacity
+- test_can_dispatch_with_worker_hosts
+- test_can_dispatch_without_worker_hosts
+- test_preferred_worker_host_available
+
+================================================================================
+NEXT STEPS (NOT PART OF THIS IMPLEMENTATION)
+================================================================================
+
+The orchestrator now:
+1. ✓ Selects appropriate worker host
+2. ✓ Tracks which host runs which issue
+3. ✓ Enforces per-host limits
+4. ✓ Provides host information in state snapshots
+
+Future work in AgentRunner:
+- Use worker_host field to determine local vs SSH execution
+- Implement SSH command execution using the selected host
+- Handle SSH connection errors and retries
+
+================================================================================

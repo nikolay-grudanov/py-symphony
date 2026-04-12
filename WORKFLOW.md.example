@@ -1,0 +1,49 @@
+---
+tracker:
+  kind: linear
+  project_slug: my-project
+  active_states:
+    - Todo
+    - In Progress
+
+polling:
+  interval_ms: 30000
+
+workspace:
+  root: ./workspaces
+
+agent:
+  max_concurrent_agents: 10
+  max_turns: 20
+  max_retry_backoff_ms: 300000
+
+# Worker extensions for remote execution (optional)
+worker:
+  # List of SSH hosts where agents can run remotely
+  # When omitted, all work runs locally
+  ssh_hosts:
+    - user@host1.example.com
+    - user@host2.example.com
+  # Maximum concurrent agents per SSH host
+  # When omitted, no per-host limit is applied
+  max_concurrent_agents_per_host: 5
+
+codex:
+  command: codex app-server
+  turn_timeout_ms: 3600000
+  stall_timeout_ms: 300000
+
+# HTTP server extension (optional)
+server:
+  # Port for the observability/control HTTP server
+  # When omitted or set to null, the HTTP server is not started
+  # Use 0 for an ephemeral local port (useful for development/testing)
+  # CLI --port flag overrides this setting
+  port: 8080
+---
+
+You are a coding agent working on the issue:
+{{issue.identifier}}: {{issue.title}}
+
+Description:
+{{issue.description}}

@@ -1,0 +1,234 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://symphony.dev/schemas/agent-output.schema.json",
+  "title": "AgentOutput",
+  "description": "Represents the output from any agent after completing a task, including status, artifacts, and optional errors.",
+  "type": "object",
+  "required": ["agent", "status", "artifacts", "message"],
+  "properties": {
+    "agent": {
+      "type": "string",
+      "description": "Identifier of the agent that produced this output",
+      "examples": ["platform-architect", "backend-developer", "security-specialist"]
+    },
+    "status": {
+      "type": "string",
+      "description": "Status of the task execution",
+      "enum": ["success", "partial", "failed"],
+      "examples": ["success", "partial", "failed"]
+    },
+    "artifacts": {
+      "type": "array",
+      "description": "List of artifacts produced by the agent",
+      "items": {
+        "type": "object",
+        "description": "Agent-produced artifact with id, type, and content",
+        "required": ["id", "type", "content"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the artifact"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of the artifact",
+            "enum": ["adr", "sdd", "diagram", "config", "code", "test", "document", "data", "output"]
+          },
+          "content": {
+            "description": "Artifact content - can be object, string, array, number, or boolean",
+            "oneOf": [
+              {"type": "object"},
+              {"type": "string"},
+              {"type": "array"},
+              {"type": "number"},
+              {"type": "boolean"}
+            ]
+          },
+          "format": {
+            "type": "string",
+            "description": "Format of the content (e.g., json, yaml, markdown, plain)",
+            "examples": ["json", "yaml", "markdown", "plain", "base64"]
+          },
+          "size": {
+            "type": "integer",
+            "description": "Size of the content in bytes (if applicable)",
+            "minimum": 0
+          },
+          "checksum": {
+            "type": "string",
+            "description": "Checksum of the content for integrity verification",
+            "pattern": "^[a-f0-9]{32,64}$"
+          }
+        }
+      },
+      "minItems": 0
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable message describing the result of the task",
+      "minLength": 1,
+      "examples": ["Architecture design completed successfully", "Partial completion: 3 out of 5 modules implemented"]
+    },
+    "errors": {
+      "type": "array",
+      "description": "List of errors encountered during task execution",
+      "items": {
+        "type": "object",
+        "description": "Error details with code, message, and context",
+        "required": ["code", "message"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Error code for programmatic handling"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error message"
+          },
+          "severity": {
+            "type": "string",
+            "description": "Severity level of the error",
+            "enum": ["warning", "error", "critical"]
+          },
+          "details": {
+            "type": "object",
+            "description": "Additional error details"
+          },
+          "stack_trace": {
+            "type": "string",
+            "description": "Stack trace if available (for debugging)"
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "Suggested fix or workaround"
+          }
+        }
+      },
+      "minItems": 0
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the output was generated",
+      "examples": ["2026-04-11T14:30:00Z"]
+    },
+    "execution_time": {
+      "type": "number",
+      "description": "Time taken to execute the task in seconds",
+      "minimum": 0,
+      "examples": [45.5, 120.75]
+    },
+    "task_id": {
+      "type": "string",
+      "description": "Identifier of the task that produced this output",
+      "examples": ["task-001", "build-stage-002"]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata about the agent output",
+      "properties": {
+        "workflow_id": {
+          "type": "string",
+          "description": "Workflow identifier"
+        },
+        "stage": {
+          "type": "string",
+          "description": "Build stage name"
+        },
+        "agent_version": {
+          "type": "string",
+          "description": "Version of the agent"
+        },
+        "environment": {
+          "type": "string",
+          "description": "Execution environment",
+          "enum": ["development", "staging", "production"]
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "examples": [
+    {
+      "agent": "platform-architect",
+      "status": "success",
+      "artifacts": [
+        {
+          "id": "arch-decision-001",
+          "type": "adr",
+          "content": {
+            "title": "Microservices Architecture Decision",
+            "context": "System scalability requirements",
+            "decision": "Adopt microservices architecture",
+            "consequences": ["Increased complexity", "Better scalability"]
+          },
+          "format": "json",
+          "size": 512,
+          "checksum": "abc123def456"
+        }
+      ],
+      "message": "Successfully completed architecture design phase",
+      "errors": [],
+      "timestamp": "2026-04-11T14:30:00Z",
+      "execution_time": 120.5,
+      "task_id": "arch-design-001",
+      "metadata": {
+        "workflow_id": "wf-001",
+        "stage": "architecture-design",
+        "agent_version": "1.2.0",
+        "environment": "development"
+      }
+    },
+    {
+      "agent": "backend-developer",
+      "status": "partial",
+      "artifacts": [
+        {
+          "id": "api-module-001",
+          "type": "code",
+          "content": {
+            "file": "api/users.py",
+            "lines": 250
+          }
+        }
+      ],
+      "message": "Partial completion: API module implemented, but authentication pending",
+      "errors": [
+        {
+          "code": "AUTH_NOT_IMPLEMENTED",
+          "message": "Authentication layer not yet implemented",
+          "severity": "warning",
+          "details": {
+            "missing": "OAuth2 token validation",
+            "estimated_time": "2 hours"
+          },
+          "suggestion": "Implement OAuth2 middleware before deployment"
+        }
+      ],
+      "timestamp": "2026-04-11T14:32:00Z",
+      "execution_time": 180.0,
+      "task_id": "backend-implementation-001"
+    },
+    {
+      "agent": "test-engineer",
+      "status": "failed",
+      "artifacts": [],
+      "message": "Test execution failed due to environment configuration issues",
+      "errors": [
+        {
+          "code": "ENV_CONFIG_ERROR",
+          "message": "Database connection string not found",
+          "severity": "critical",
+          "details": {
+            "missing_variable": "DATABASE_URL",
+            "config_file": "/app/config/env.yaml"
+          },
+          "suggestion": "Set DATABASE_URL environment variable"
+        }
+      ],
+      "timestamp": "2026-04-11T14:35:00Z",
+      "execution_time": 5.2,
+      "task_id": "test-execution-001"
+    }
+  ]
+}

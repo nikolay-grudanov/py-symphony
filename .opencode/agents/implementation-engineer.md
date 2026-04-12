@@ -2,7 +2,7 @@
 name: implementation-engineer
 description: Инженер-реализатор
 mode: subagent
-model: zai-coding-plan/glm-4.7
+model: minimax/MiniMax-M2.5
 temperature: 0.2
 tools:
   read: true
