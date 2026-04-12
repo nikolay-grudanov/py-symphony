@@ -1,52 +1,25 @@
-"""Jira tracker adapter for Symphony.
+"""Internal Jira REST API tracker adapter.
 
-This adapter provides integration with Jira issue tracking system
-using the Jira REST API (v3).
+This module contains the full Jira tracker implementation.
+The runtime/tracker/jira.py module re-exports this for backwards compatibility.
+This allows the plugin to import from runtime.tracker.base without circular imports.
 """
 
+import base64
 from typing import Any, Dict, List, Optional
 
 import requests
 
-from runtime.tracker.base import TrackerClient
-from runtime.tracker.normalization import NormalizationUtils
-
-
-# Local error classes (do NOT import from factory)
-class TrackerAPIError(Exception):
-    """Base tracker API error."""
-
-    pass
-
-
-class TrackerApiRequestError(TrackerAPIError):
-    """Network/transport error."""
-
-    pass
-
-
-class TrackerApiStatusError(TrackerAPIError):
-    """HTTP status error."""
-
-    pass
-
-
-class TrackerApiRateLimitError(TrackerApiStatusError):
-    """Rate limit error (429)."""
-
-    pass
-
-
-class TrackerApiTimeoutError(TrackerApiRequestError):
-    """Request timeout error."""
-
-    pass
-
-
-class TrackerApiResourceNotFoundError(TrackerApiStatusError):
-    """Resource not found error (404)."""
-
-    pass
+from .base import TrackerClient
+from .factory import (
+    TrackerAPIError,
+    TrackerApiRequestError,
+    TrackerApiStatusError,
+    TrackerApiRateLimitError,
+    TrackerApiTimeoutError,
+    TrackerApiResourceNotFoundError,
+)
+from .normalization import NormalizationUtils
 
 
 # Default configuration
@@ -57,21 +30,12 @@ MAX_RESULTS = 50
 DEFAULT_ACTIVE_STATES = ["To Do", "In Progress"]
 
 
-class JiraAdapter(TrackerClient):
+class JiraTracker(TrackerClient):
     """Jira issue tracker adapter.
 
     Implements the TrackerClient interface for Jira's REST API.
     Supports Jira Cloud with Basic Authentication.
     """
-
-    __plugin_info__: Dict[str, Any] = {
-        "name": "symphony-jira",
-        "version": "1.0.0",
-        "tracker_kind": "jira",
-        "description": "Jira tracker adapter for Symphony",
-        "author": "Symphony Team",
-        "homepage": "https://github.com/symphony-dev/symphony-jira",
-    }
 
     def __init__(
         self,
@@ -112,8 +76,6 @@ class JiraAdapter(TrackerClient):
         Returns:
             Basic Auth header value (base64 encoded credentials)
         """
-        import base64
-
         credentials = f"{self._username}:{self._api_key}"
         encoded = base64.b64encode(credentials.encode()).decode()
         return f"Basic {encoded}"
@@ -168,7 +130,9 @@ class JiraAdapter(TrackerClient):
 
             # Handle unauthorized (401)
             if response.status_code == 401:
-                raise TrackerApiStatusError("Invalid Jira credentials (401 Unauthorized)")
+                raise TrackerApiStatusError(
+                    "Invalid Jira credentials (401 Unauthorized)"
+                )
 
             # Handle forbidden (403)
             if response.status_code == 403:
@@ -183,7 +147,9 @@ class JiraAdapter(TrackerClient):
             # Handle other client errors (400-499)
             if 400 <= response.status_code < 500:
                 error_msg = self._parse_error_response(response)
-                raise TrackerApiStatusError(f"Jira API error {response.status_code}: {error_msg}")
+                raise TrackerApiStatusError(
+                    f"Jira API error {response.status_code}: {error_msg}"
+                )
 
             # Handle server errors (500+)
             if response.status_code >= 500:
@@ -194,7 +160,9 @@ class JiraAdapter(TrackerClient):
             return response
 
         except requests.exceptions.Timeout as e:
-            raise TrackerApiTimeoutError(f"Request timeout after {self._timeout}s: {e}") from e
+            raise TrackerApiTimeoutError(
+                f"Request timeout after {self._timeout}s: {e}"
+            ) from e
         except requests.exceptions.ConnectionError as e:
             raise TrackerApiRequestError(f"Connection failed: {e}") from e
         except requests.exceptions.RequestException as e:
@@ -601,7 +569,8 @@ class JiraAdapter(TrackerClient):
 
         available = [t.get("name") for t in transitions]
         raise TrackerAPIError(
-            f"No transition found for status '{target_status}'. Available transitions: {available}"
+            f"No transition found for status '{target_status}'. "
+            f"Available transitions: {available}"
         )
 
     def move_to_status(self, issue_id: str, target_status: str) -> Dict[str, Any]:

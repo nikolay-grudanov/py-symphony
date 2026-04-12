@@ -1,0 +1,27 @@
+"""Jira REST API tracker adapter.
+
+DEPRECATED: This is a deprecated wrapper for compatibility.
+Use symphony-jira plugin instead: pip install symphony-jira
+"""
+
+import warnings
+from typing import Any, Dict, List, Optional
+
+
+from runtime.tracker.base import TrackerClient
+
+# Import from plugin (will be installed as dependency)
+try:
+    from symphony_jira.adapter import JiraAdapter as JiraTracker
+except ImportError:
+    # Fallback to internal implementation if plugin not installed
+    warnings.warn(
+        "symphony-jira plugin not installed. Using deprecated built-in adapter. "
+        "Install the plugin: pip install symphony-jira",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    from runtime.tracker._jira_internal import JiraTracker
+
+# Re-export for backwards compatibility
+__all__ = ["JiraTracker"]

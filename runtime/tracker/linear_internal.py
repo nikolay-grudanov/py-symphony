@@ -1,52 +1,23 @@
 """Linear GraphQL tracker adapter.
 
-This adapter provides integration with Linear issue tracking system
-using the Linear GraphQL API.
+This module contains the full Linear tracker implementation.
+The runtime/tracker/linear.py module re-exports this for backwards compatibility.
+This allows the plugin to import from runtime.tracker.base without circular imports.
 """
 
 from typing import Any, Dict, List, Optional
 
 import requests
 
-from runtime.tracker.base import TrackerClient
-from runtime.tracker.normalization import NormalizationUtils
-
-
-# Local error classes (do NOT import from factory)
-class TrackerAPIError(Exception):
-    """Base tracker API error."""
-
-    pass
-
-
-class TrackerApiRequestError(TrackerAPIError):
-    """Network/transport error."""
-
-    pass
-
-
-class TrackerApiStatusError(TrackerAPIError):
-    """HTTP status error."""
-
-    pass
-
-
-class TrackerApiRateLimitError(TrackerApiStatusError):
-    """Rate limit error (429)."""
-
-    pass
-
-
-class TrackerApiTimeoutError(TrackerApiRequestError):
-    """Request timeout error."""
-
-    pass
-
-
-class TrackerApiResourceNotFoundError(TrackerApiStatusError):
-    """Resource not found error (404)."""
-
-    pass
+from .base import TrackerClient
+from .factory import (
+    TrackerAPIError,
+    TrackerApiRequestError,
+    TrackerApiStatusError,
+    TrackerApiRateLimitError,
+    TrackerApiTimeoutError,
+)
+from .normalization import NormalizationUtils
 
 
 # Default active states for candidate issues
@@ -63,20 +34,11 @@ RELATION_PAGE_SIZE = 50
 DEFAULT_TIMEOUT_SECONDS = 30
 
 
-class LinearAdapter(TrackerClient):
+class LinearTracker(TrackerClient):
     """Linear issue tracker adapter.
 
     Implements the TrackerClient interface for Linear's GraphQL API.
     """
-
-    __plugin_info__: Dict[str, Any] = {
-        "name": "symphony-linear",
-        "version": "1.0.0",
-        "tracker_kind": "linear",
-        "description": "Linear tracker adapter for Symphony",
-        "author": "Symphony Team",
-        "homepage": "https://github.com/symphony-dev/symphony-linear",
-    }
 
     def __init__(
         self,
@@ -159,8 +121,12 @@ class LinearAdapter(TrackerClient):
 
             # Check for GraphQL errors
             if "errors" in data:
-                error_messages = [err.get("message", "Unknown error") for err in data["errors"]]
-                raise TrackerAPIError(f"Linear GraphQL errors: {'; '.join(error_messages)}")
+                error_messages = [
+                    err.get("message", "Unknown error") for err in data["errors"]
+                ]
+                raise TrackerAPIError(
+                    f"Linear GraphQL errors: {'; '.join(error_messages)}"
+                )
 
             return data
 
@@ -191,9 +157,13 @@ class LinearAdapter(TrackerClient):
 
         # Extract blockers from inverseRelations (type: "blocks")
         blocked_by = []
-        if raw_issue.get("inverseRelations") and raw_issue["inverseRelations"].get("nodes"):
+        if raw_issue.get("inverseRelations") and raw_issue["inverseRelations"].get(
+            "nodes"
+        ):
             for relation in raw_issue["inverseRelations"]["nodes"]:
-                if relation.get("type", "").lower() == "blocks" and relation.get("issue"):
+                if relation.get("type", "").lower() == "blocks" and relation.get(
+                    "issue"
+                ):
                     blocker = relation["issue"]
                     blocked_by.append(
                         {
@@ -322,7 +292,9 @@ class LinearAdapter(TrackerClient):
             TrackerAPIError: On API errors
         """
         if not self._project_slug:
-            raise TrackerAPIError("Linear tracker requires project_slug to be configured")
+            raise TrackerAPIError(
+                "Linear tracker requires project_slug to be configured"
+            )
 
         if not state_names:
             return []
@@ -335,7 +307,9 @@ class LinearAdapter(TrackerClient):
 
         # Paginate through all results
         while True:
-            issues, page_info = self._fetch_issues_by_states_page(normalized_states, cursor)
+            issues, page_info = self._fetch_issues_by_states_page(
+                normalized_states, cursor
+            )
             all_issues.extend(issues)
 
             if page_info is None:
@@ -359,7 +333,9 @@ class LinearAdapter(TrackerClient):
             TrackerAPIError: On API errors
         """
         if not self._project_slug:
-            raise TrackerAPIError("Linear tracker requires project_slug to be configured")
+            raise TrackerAPIError(
+                "Linear tracker requires project_slug to be configured"
+            )
 
         if not issue_ids:
             return {}
@@ -447,6 +423,8 @@ class LinearAdapter(TrackerClient):
             TrackerAPIError: On API errors
         """
         if not self._project_slug:
-            raise TrackerAPIError("Linear tracker requires project_slug to be configured")
+            raise TrackerAPIError(
+                "Linear tracker requires project_slug to be configured"
+            )
 
         return self.fetch_issues_by_states(self._active_states)

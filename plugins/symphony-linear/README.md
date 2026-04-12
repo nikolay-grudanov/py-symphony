@@ -57,7 +57,12 @@ To obtain a Linear API key:
 - **Issue Fetching**: Fetch candidate issues in active states
 - **State Filtering**: Query issues by specific states
 - **Bulk State Lookup**: Get current states for multiple issues
+- **Read-Only Design**: Optimized for polling and monitoring workflows
 - **Plugin Architecture**: Fully integrated with Symphony's plugin system
+- **Entry Point Discovery**: Automatic discovery via `symphony.trackers` entry point
+
+**Note:** This adapter is designed for read-only operations (fetching issues and states).
+For write operations (updating issues, adding comments), use the Linear API directly or extend the adapter.
 - **Entry Point Discovery**: Automatic discovery via `symphony.trackers` entry point
 
 ## Plugin Information
@@ -130,13 +135,15 @@ states = adapter.fetch_issue_states_by_ids(["LINEAR-123", "LINEAR-456"])
 
 ## Error Handling
 
-The adapter uses error classes from `runtime.tracker.factory`:
+The adapter defines local error classes for independence from the runtime:
 
 - `TrackerAPIError` - Base exception for API errors
 - `TrackerApiRequestError` - Network/transport failures
 - `TrackerApiStatusError` - Non-200 HTTP responses
 - `TrackerApiTimeoutError` - Request timeouts
 - `TrackerApiRateLimitError` - Rate limit errors (429)
+
+These error classes are defined locally in the adapter to ensure plugin independence.
 
 ## License
 

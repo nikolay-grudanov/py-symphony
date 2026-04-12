@@ -153,73 +153,25 @@ class TrackerFactory:
     def _build_config_dict(config: Any, kind: str) -> Dict[str, Any]:
         """Build configuration dictionary for adapter instantiation.
 
-        Maps global config keys to adapter-specific keys.
-        Different tracker kinds may need different parameter names.
-
         Args:
             config: Configuration object
-            kind: Tracker kind identifier
+            kind: Tracker kind identifier (unused, kept for compatibility)
 
         Returns:
             Configuration dictionary for adapter constructor
         """
-        # Base config that all adapters can use
-        config_dict: Dict[str, Any] = {
+        config_dict = {
             "api_key": getattr(config, "tracker_api_key", None),
             "endpoint": getattr(config, "tracker_endpoint", None),
             "username": getattr(config, "tracker_username", None),
             "timeout": getattr(config, "tracker_timeout", 30),
             "active_states": getattr(config, "tracker_active_states", None),
+            # Both options - adapter will use what it needs
+            "project_slug": getattr(config, "tracker_project_slug", None),
+            "project_key": getattr(config, "tracker_project_slug", None),
         }
-
-        # Tracker-specific mappings
-        if kind == "linear":
-            config_dict["project_slug"] = getattr(config, "tracker_project_slug", None)
-        elif kind == "jira":
-            config_dict["project_key"] = getattr(config, "tracker_project_slug", None)
-        else:
-            # Generic: try common parameter names
-            config_dict["project_slug"] = getattr(config, "tracker_project_slug", None)
-            config_dict["project_key"] = getattr(config, "tracker_project_slug", None)
 
         # Remove None values
         config_dict = {k: v for k, v in config_dict.items() if v is not None}
 
-        # Validate required parameters
-        TrackerFactory._validate_config(kind, config_dict)
-
         return config_dict
-
-    @staticmethod
-    def _validate_config(kind: str, config_dict: Dict[str, Any]) -> None:
-        """Validate required configuration parameters.
-
-        Args:
-            kind: Tracker kind identifier
-            config_dict: Configuration dictionary
-
-        Raises:
-            TrackerConfigError: If required parameters are missing
-        """
-        if kind == "linear":
-            missing = []
-            if "api_key" not in config_dict:
-                missing.append("api_key")
-            if "project_slug" not in config_dict:
-                missing.append("project_slug")
-            if missing:
-                raise TrackerConfigError(
-                    f"Linear adapter requires missing configuration parameters: {', '.join(missing)}. "
-                    f"Please provide tracker_api_key and tracker_project_slug in configuration."
-                )
-        elif kind == "jira":
-            missing = []
-            if "api_key" not in config_dict:
-                missing.append("api_key")
-            if "endpoint" not in config_dict:
-                missing.append("endpoint")
-            if missing:
-                raise TrackerConfigError(
-                    f"Jira adapter requires missing configuration parameters: {', '.join(missing)}. "
-                    f"Please provide tracker_api_key and tracker_endpoint in configuration."
-                )
