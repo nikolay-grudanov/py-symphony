@@ -11,8 +11,8 @@
 - Подробная реализация для Elixir: [`elixir/AGENTS.md`](elixir/AGENTS.md)
 - Конфигурация рантайма: `WORKFLOW.md` (YAML front matter + prompt template)
 - PR-шаблон: [`.github/pull_request_template.md`](.github/pull_request_template.md)
-- Статус реализации pluggable tracker: [`docs/tracker-implementation-status.md`](docs/tracker-implementation-status.md)
-- План развития tracker адаптера: [`docs/tracker-next-steps.md`](docs/tracker-next-steps.md)
+- Статус реализации pluggable tracker: [`docs/status/tracker-implementation-status.md`](docs/status/tracker-implementation-status.md)
+- План развития tracker адаптера: [`docs/planning/tracker-next-steps.md`](docs/planning/tracker-next-steps.md)
 
 ## Как запустить
 
@@ -45,6 +45,24 @@ mix pr_body.check --file /path/to/pr_body.md
 - Workspaces должны оставаться в пределах настроенного workspace root
 - Держать реализацию согласованной со `SPEC.md` (реализация может быть надмножеством, но не должна конфликтовать)
 
+## Конституция проекта
+
+**ВАЖНО:** Все агенты обязаны:
+
+1. **Читать** конституцию проекта перед началом работы: `.specify/memory/constitution.md`
+2. **Следовать** всем принципам и инвариантам, изложенным в конституции
+3. **Соответствовать** Quality Gates (5 последовательных gate)
+4. **Не нарушать** файловые инварианты (runtime/, plugins/, agents/)
+
+Конституция содержит неизменяемые инварианты системы:
+- Двойная агностичность (tracker + agent)
+- Технологический стек (Python 3.11+, uv, pytest, ruff)
+- Архитектура плагинов и state machine
+- Quality Governance (ADR, Quality Gates)
+- Build-Orchestrator ограничения
+
+Нарушение конституции = блокировка merge, независимо от обстоятельств.
+
 ## Архитектура
 
 Основные компоненты (подробнее в SPEC.md Section 3):
@@ -66,8 +84,8 @@ mix pr_body.check --file /path/to/pr_body.md
 Реализован pluggable tracker adapter с поддержкой множественных систем отслеживания задач.
 
 **Документация:**
-- Статус реализации: [`docs/tracker-implementation-status.md`](docs/tracker-implementation-status.md)
-- План развития: [`docs/tracker-next-steps.md`](docs/tracker-next-steps.md)
+- Статус реализации: [`docs/status/tracker-implementation-status.md`](docs/status/tracker-implementation-status.md)
+- План развития: [`docs/planning/tracker-next-steps.md`](docs/planning/tracker-next-steps.md)
 
 **Поддерживаемые трекеры:**
 - Linear (stub implementation, требует LINEAR_API_KEY)
