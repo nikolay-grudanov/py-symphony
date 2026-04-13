@@ -426,4 +426,4 @@ stateDiagram-v2
 - [Transition Rules](./transition-rules.md)
 - [Escalation Rules](./escalation-rules.md)
 - [Approval Gates](./approval-gates.md)
-- [Build Team Documentation](../build-team-package-final-report.md)
+- [Build Team Documentation](../reports/build-team-package-final-report.md)

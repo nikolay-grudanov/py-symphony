@@ -251,7 +251,7 @@
 
 ## 7. Implementation Roadmap ✅
 
-Создан **Implementation Roadmap** в `docs/implementation-roadmap.md`:
+Создан **Implementation Roadmap** в `docs/planning/implementation-roadmap.md`:
 
 ### MVP vs Target Architecture
 
@@ -327,7 +327,7 @@
 | 22 | `docs/state-machines.md` | ✅ | State Machine specifications |
 | 23 | `docs/handoff-contracts.md` | ✅ | Handoff Contracts |
 | 24 | `docs/repository-structure.md` | ✅ | Repository Structure |
-| 25 | `docs/implementation-roadmap.md` | ✅ | Implementation Roadmap |
+| 25 | `docs/planning/implementation-roadmap.md` | ✅ | Implementation Roadmap |
 
 ### Дополнительные файлы для создания после bootstrap
 

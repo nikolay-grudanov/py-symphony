@@ -25,7 +25,7 @@
 
 1. **Build Team:** Изучите [Build Agent Catalog](../.opencode/agents/) - кто за что отвечает
 2. **Skills:** Ознакомьтесь с [Skill Catalog](../.opencode/skills/) - какие навыки есть у каждого агента
-3. **Implementation:** Следуйте [Implementation Roadmap](implementation-roadmap.md) - план по фазам
+3. **Implementation:** Следуйте [Implementation Roadmap](planning/implementation-roadmap.md) - план по фазам
 
 ---
 
@@ -225,7 +225,7 @@
 
 ### Implementation Roadmap
 
-**Файл:** [implementation-roadmap.md](implementation-roadmap.md)  
+**Файл:** [planning/implementation-roadmap.md](planning/implementation-roadmap.md)  
 **Размер:** 40 KB
 
 План реализации по фазам:
@@ -360,7 +360,7 @@
 
 ## Final Report
 
-**Файл:** [build-team-package-final-report.md](build-team-package-final-report.md)
+**Файл:** [reports/build-team-package-final-report.md](reports/build-team-package-final-report.md)
 
 Итоговый отчёт о создании Build Team и всех артефактов:
 

@@ -181,7 +181,7 @@ Discovery → Design in Progress → Architecture Review → Implementation Read
 - 🔄 [State Machines](docs/state-machines.md) - State machine спецификации
 - 🤝 [Handoff Contracts](docs/handoff-contracts.md) - Контракты между агентами
 - 📁 [Repository Structure](docs/repository-structure.md) - Структура репозитория
-- 🗺️ [Implementation Roadmap](docs/implementation-roadmap.md) - План реализации (5 фаз)
+- 🗺️ [Implementation Roadmap](docs/planning/implementation-roadmap.md) - План реализации (5 фаз)
 
 ### Build Team Documentation
 
@@ -256,7 +256,7 @@ ls -la .opencode/skills/    # Skills
 Для вклада:
 1. Изучите [Software Design Document](docs/sdd-orchestration-platform.md)
 2. Изучите [Build Agents](.opencode/agents/)
-3. Следуйте [Implementation Roadmap](docs/implementation-roadmap.md)
+3. Следуйте [Implementation Roadmap](docs/planning/implementation-roadmap.md)
 4. Создайте PR для review
 
 ---
