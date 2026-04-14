@@ -12,10 +12,12 @@ User Story 1 Goal:
 Enable Symphony orchestration platform to configure Yandex Tracker as issue tracking system.
 """
 
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from symphony_yandex_tracker.adapter import YandexTrackerAdapter
+
 from symphony_yandex_tracker import errors
+from symphony_yandex_tracker.adapter import YandexTrackerAdapter
 
 
 class TestUserStory1AdapterInitialization:
@@ -119,9 +121,7 @@ class TestUserStory1AdapterInitialization:
         Test case: initialization succeeds, authentication is lazy (not called on init)
         Verify: adapter initialization does not call authentication API
         """
-        with patch(
-            "symphony_yandex_tracker.adapter.http_client_module.TrackerHttpClient"
-        ) as mock_client_class:
+        with patch("symphony_yandex_tracker.adapter.http_client_module.TrackerHttpClient") as mock_client_class:
             # Create adapter - should NOT instantiate HTTP client yet
             adapter = YandexTrackerAdapter(
                 api_key="y0_test_token",
@@ -139,9 +139,7 @@ class TestUserStory1AdapterInitialization:
 
         Verify: HTTP client is created only when _get_http_client() is called
         """
-        with patch(
-            "symphony_yandex_tracker.adapter.http_client_module.TrackerHttpClient"
-        ) as mock_client_class:
+        with patch("symphony_yandex_tracker.adapter.http_client_module.TrackerHttpClient") as mock_client_class:
             mock_client_instance = Mock()
             mock_client_class.return_value = mock_client_instance
 
@@ -169,9 +167,7 @@ class TestUserStory1AdapterInitialization:
 
         Verify: authenticate() method can be called separately after init
         """
-        with patch(
-            "symphony_yandex_tracker.adapter.http_client_module.TrackerHttpClient"
-        ) as mock_client_class:
+        with patch("symphony_yandex_tracker.adapter.http_client_module.TrackerHttpClient") as mock_client_class:
             mock_response = Mock()
             mock_response.status_code = 200
             mock_response.json.return_value = {"uid": 12345, "login": "testuser"}
@@ -202,9 +198,7 @@ class TestUserStory1AdapterInitialization:
         Verify: authenticate() makes correct API call (GET /v2/myself)
         Verify: authenticate() includes Authorization header
         """
-        with patch(
-            "symphony_yandex_tracker.adapter.http_client_module.TrackerHttpClient"
-        ) as mock_client_class:
+        with patch("symphony_yandex_tracker.adapter.http_client_module.TrackerHttpClient") as mock_client_class:
             # Mock API response
             mock_response = Mock()
             mock_response.status_code = 200
@@ -242,9 +236,7 @@ class TestUserStory1AdapterInitialization:
 
         Test both OAuth token (y0__ prefix) and IAM token (t1. prefix)
         """
-        with patch(
-            "symphony_yandex_tracker.adapter.http_client_module.TrackerHttpClient"
-        ) as mock_client_class:
+        with patch("symphony_yandex_tracker.adapter.http_client_module.TrackerHttpClient") as mock_client_class:
             mock_response = Mock()
             mock_response.status_code = 200
             mock_response.json.return_value = {"uid": 67890, "login": "iamuser"}
@@ -269,9 +261,7 @@ class TestUserStory1AdapterInitialization:
 
         Verify: HTTP client is created with proper Authorization header
         """
-        with patch(
-            "symphony_yandex_tracker.adapter.http_client_module.TrackerHttpClient"
-        ) as mock_client_class:
+        with patch("symphony_yandex_tracker.adapter.http_client_module.TrackerHttpClient") as mock_client_class:
             mock_response = Mock()
             mock_response.status_code = 200
             mock_response.json.return_value = {"uid": 12345, "login": "testuser"}
@@ -293,9 +283,7 @@ class TestUserStory1AdapterInitialization:
 
     def test_authentication_raises_token_expired_error_on_401(self):
         """Test T014: authenticate() raises TokenExpiredError on 401 response."""
-        with patch(
-            "symphony_yandex_tracker.adapter.http_client_module.TrackerHttpClient"
-        ) as mock_client_class:
+        with patch("symphony_yandex_tracker.adapter.http_client_module.TrackerHttpClient") as mock_client_class:
             mock_response = Mock()
             mock_response.status_code = 401
             mock_response.text = "Unauthorized"
@@ -317,9 +305,7 @@ class TestUserStory1AdapterInitialization:
 
     def test_authentication_raises_tracker_api_error_on_non_200_non_401(self):
         """Test T014: authenticate() raises TrackerApiError on other error responses."""
-        with patch(
-            "symphony_yandex_tracker.adapter.http_client_module.TrackerHttpClient"
-        ) as mock_client_class:
+        with patch("symphony_yandex_tracker.adapter.http_client_module.TrackerHttpClient") as mock_client_class:
             mock_response = Mock()
             mock_response.status_code = 500
             mock_response.text = "Internal Server Error"

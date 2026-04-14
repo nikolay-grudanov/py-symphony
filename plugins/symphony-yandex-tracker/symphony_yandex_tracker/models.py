@@ -166,10 +166,7 @@ class UpdateIssueRequest:
         for field_name in ["followers", "attachments", "tags"]:
             operations = getattr(self, field_name)
             if operations is not None and not isinstance(operations, ArrayFieldOperations):
-                errors.append(
-                    f"{field_name} must be ArrayFieldOperations or None, "
-                    f"got {type(operations).__name__}"
-                )
+                errors.append(f"{field_name} must be ArrayFieldOperations or None, got {type(operations).__name__}")
 
         return errors
 

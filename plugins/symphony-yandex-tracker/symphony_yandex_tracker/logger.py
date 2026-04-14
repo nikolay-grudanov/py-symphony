@@ -21,10 +21,13 @@ class JsonFormatter(logging.Formatter):
     - issue_id: ID of the issue being operated on (if applicable)
     - action: Name of the operation (e.g., "authenticate", "fetch_issues")
     - outcome: Result of the operation ("success" or "error")
-    - duration_ms: Duration of the operation in milliseconds
+    - duration_ms: Duration of the operation in milliseconds (always ms)
     - error_message: Error message (only on errors)
     - stack_trace: Exception stack trace (only on errors)
     - timestamp: UTC timestamp in ISO 8601 format
+
+    Note: duration_ms is always expected in milliseconds. The OperationTimer
+    class handles conversion from seconds to milliseconds internally.
 
     Also includes standard logging fields: level, logger, message.
 
@@ -96,10 +99,9 @@ class JsonFormatter(logging.Formatter):
         outcome = getattr(record, "outcome", None)
         duration_ms: float | None = getattr(record, "duration_ms", None)
 
-        # Handle duration_ms specially - convert from seconds to ms if needed
-        if duration_ms is not None and duration_ms < 1000:
-            # Assume it's in seconds (from time.time() - start_time)
-            duration_ms = duration_ms * 1000
+        # duration_ms is always in milliseconds (from OperationTimer)
+        if duration_ms is None:
+            duration_ms = 0.0
 
         log_entry["issue_id"] = issue_id
         log_entry["action"] = action
@@ -230,9 +232,7 @@ class OperationTimer:
         self.start_time = time.time()
         return self
 
-    def __exit__(
-        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any
-    ) -> None:
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any) -> None:
         """Stop timing."""
         self.end_time = time.time()
         self.duration_ms = (self.end_time - self.start_time) * 1000

@@ -73,7 +73,7 @@ class YandexTrackerAdapter:
         self,
         api_key: str,
         endpoint: str = DEFAULT_ENDPOINT,
-        timeout: int = 30,
+        timeout: float = 30.0,
         active_states: list[str] | None = None,
         project_slug: str = "",
     ) -> None:
@@ -140,7 +140,7 @@ class YandexTrackerAdapter:
         return self._endpoint
 
     @property
-    def timeout(self) -> int:
+    def timeout(self) -> float:
         """Return the request timeout in seconds.
 
         Returns:
@@ -202,7 +202,7 @@ class YandexTrackerAdapter:
 
         Raises:
             errors.TrackerApiError: If API request fails.
-            errors.TimeoutError: If request times out.
+            errors.TrackerTimeoutError: If request times out.
             errors.TokenExpiredError: If token is invalid or expired.
         """
         with logger_module.OperationTimer() as timer:
@@ -241,7 +241,7 @@ class YandexTrackerAdapter:
                         "error_message": str(e),
                     },
                 )
-                raise errors.TimeoutError(
+                raise errors.TrackerTimeoutError(
                     message=f"Request timed out: {e}",
                     timeout=float(self._timeout),
                     url=f"{self._endpoint}/v2/myself",
@@ -288,7 +288,7 @@ class YandexTrackerAdapter:
         Raises:
             errors.ConfigurationError: If project_slug is not set.
             errors.TrackerApiError: If API request fails.
-            errors.TimeoutError: If request times out.
+            errors.TrackerTimeoutError: If request times out.
         """
         if not self._project_slug:
             raise errors.ConfigurationError(
@@ -342,7 +342,7 @@ class YandexTrackerAdapter:
                         "error_message": str(e),
                     },
                 )
-                raise errors.TimeoutError(
+                raise errors.TrackerTimeoutError(
                     message=f"Request timed out: {e}",
                     timeout=float(self._timeout),
                 )
@@ -394,11 +394,7 @@ class YandexTrackerAdapter:
                 if response.status_code == 200:
                     all_issues = response.json()
                     # Filter by states locally
-                    filtered = [
-                        issue
-                        for issue in all_issues
-                        if issue.get("status", {}).get("name") in states
-                    ]
+                    filtered = [issue for issue in all_issues if issue.get("status", {}).get("name") in states]
                     self._logger.info(
                         f"Fetched {len(filtered)} issues by state",
                         extra={

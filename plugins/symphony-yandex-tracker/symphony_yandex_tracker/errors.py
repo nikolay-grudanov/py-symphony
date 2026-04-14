@@ -6,7 +6,7 @@ All errors inherit from the base TrackerError class.
 Classes:
     TrackerError: Base exception for all tracker-related errors.
     TrackerApiError: API request/response errors.
-    TimeoutError: Request timeout errors.
+    TrackerTimeoutError: Request timeout errors.
     TokenExpiredError: Authentication token expiration errors.
     ResourceNotFoundError: Resource not found errors.
     TransitionNotFoundError: Status transition not found errors.
@@ -83,7 +83,7 @@ class TrackerApiError(TrackerError):
         )
 
 
-class TimeoutError(TrackerError):
+class TrackerTimeoutError(TrackerError):
     """Request timeout error.
 
     Raised when a request to the Yandex Tracker API exceeds the configured
@@ -101,7 +101,7 @@ class TimeoutError(TrackerError):
         url: str | None = None,
         details: dict[str, Any] | None = None,
     ) -> None:
-        """Initialize TimeoutError.
+        """Initialize TrackerTimeoutError.
 
         Args:
             message: Human-readable error message.
@@ -115,7 +115,7 @@ class TimeoutError(TrackerError):
 
     def __repr__(self) -> str:
         """Return string representation of the error."""
-        return f"TimeoutError(message={self.message!r}, timeout={self.timeout!r}, url={self.url!r})"
+        return f"TrackerTimeoutError(message={self.message!r}, timeout={self.timeout!r}, url={self.url!r})"
 
 
 class TokenExpiredError(TrackerError):
