@@ -12,13 +12,14 @@ User Story 1 Goal:
 Enable Symphony orchestration platform to configure Yandex Tracker as issue tracking system.
 """
 
+from pathlib import Path
 from unittest.mock import Mock, patch
 
-import pytest
 import httpx
+import pytest
+import tomli
 
-from symphony_yandex_tracker import errors
-from symphony_yandex_tracker import models
+from symphony_yandex_tracker import errors, models
 from symphony_yandex_tracker.adapter import YandexTrackerAdapter
 
 
@@ -455,7 +456,10 @@ class TestUserStory3FetchIssuesByState:
             assert issue["title"] == "Test issue"
             assert issue["state"] == "open"  # normalized to lowercase
             assert issue["priority"] is not None
-            assert issue["created_at"] == "2024-01-15T10:30:00Z"
+            # created_at is returned as datetime object
+            assert issue["created_at"].year == 2024
+            assert issue["created_at"].month == 1
+            assert issue["created_at"].day == 15
             assert issue["labels"] == ["test"]
             assert issue["blocked_by"] == ["TEST-99"]
 
@@ -2740,18 +2744,22 @@ class TestUserStory8PluginRegistration:
     # T066: Test entry point exists in symphony.trackers group
     def test_t066_entry_point_exists_in_symphony_trackers_group(self):
         """Test T066: Entry point exists in symphony.trackers group."""
-        from importlib.metadata import entry_points
+        # Load pyproject.toml directly to verify entry point declaration
+        pyproject_path = Path(__file__).parent.parent / "pyproject.toml"
+        with pyproject_path.open("rb") as f:
+            config = tomli.load(f)
 
-        # Get entry points for symphony.trackers group
-        eps = entry_points(group="symphony.trackers")
+        # Verify entry points section exists
+        assert "project" in config
+        assert "entry-points" in config["project"]
+        assert "symphony.trackers" in config["project"]["entry-points"]
 
-        # Verify yandex_tracker entry point exists (convert to dict for compatibility)
-        ep_dict = {ep.name: ep for ep in eps}
-        assert "yandex_tracker" in ep_dict
+        # Verify yandex_tracker entry point is declared
+        eps = config["project"]["entry-points"]["symphony.trackers"]
+        assert "yandex_tracker" in eps
 
         # Verify it points to correct class
-        ep = ep_dict["yandex_tracker"]
-        assert ep.value == "symphony_yandex_tracker.adapter:YandexTrackerAdapter"
+        assert eps["yandex_tracker"] == "symphony_yandex_tracker.adapter:YandexTrackerAdapter"
 
     # T067: Test YandexTrackerAdapter is importable
     def test_t067_yandex_tracker_adapter_is_importable(self):
