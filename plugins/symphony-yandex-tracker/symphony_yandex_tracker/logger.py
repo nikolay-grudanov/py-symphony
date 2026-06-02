@@ -5,10 +5,12 @@ as per FR-016, and sensitive information protection as per FR-017.
 
 Classes:
     JsonFormatter: Custom logging formatter for structured JSON output.
+    OperationTimer: Context manager for timing operations.
 """
 
 import json
 import logging
+import re
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -32,9 +34,11 @@ class JsonFormatter(logging.Formatter):
     Also includes standard logging fields: level, logger, message.
 
     Sensitive information protection (FR-017):
-    - OAuth tokens (starting with "y0__") are masked
-    - IAM tokens (starting with "t1.") are masked
-    - Organization IDs are masked in headers
+    - OAuth tokens (y0_*, y0.*) are masked, first 4 chars visible
+    - IAM tokens (t1.*) are masked, first 4 chars visible
+    - Organization IDs (20+ chars) masked, last 4 chars visible
+    - Query params with token names are masked
+    - Authorization header values are masked
 
     Example:
         >>> import logging
@@ -170,42 +174,35 @@ class JsonFormatter(logging.Formatter):
         Returns:
             Text with tokens masked.
         """
-        # Mask OAuth tokens (start with "y0__")
-        if "y0__" in text:
-            # Replace token after "y0__" with masked version
-            parts = text.split("y0__")
-            for i, part in enumerate(parts[1:], start=1):
-                # Find the next space or end of token-like string
-                # Tokens are typically alphanumeric with some special chars
-                import re
-
-                match = re.match(r"([A-Za-z0-9_-]+)", part)
-                if match:
-                    token_length = len(match.group(1))
-                    if token_length > 4:
-                        # Mask all but first 4 chars
-                        masked_token = match.group(1)[:4] + "*" * (token_length - 4)
-                        parts[i] = parts[i].replace(match.group(1), masked_token, 1)
-
-            text = "y0__".join(parts)
+        # Mask OAuth tokens (y0__xxx, y0.xxx, y0_xxx patterns)
+        # Match prefix + token value, mask after first 4 chars
+        text = re.sub(
+            r"(y0[_.])([A-Za-z0-9_-]{4,})",
+            lambda m: m.group(1) + m.group(2)[:4] + "*" * (len(m.group(2)) - 4),
+            text,
+        )
 
         # Mask IAM tokens (start with "t1.")
-        if "t1." in text:
-            import re
-
-            # Replace after "t1." until next space or end
-            text = re.sub(
-                r"(t1\.)([A-Za-z0-9_-]{10,})",
-                lambda m: m.group(1) + m.group(2)[:4] + "*" * (len(m.group(2)) - 4),
-                text,
-            )
+        # Replace after "t1." until next space or end
+        text = re.sub(
+            r"(t1\.)([A-Za-z0-9_-]{10,})",
+            lambda m: m.group(1) + m.group(2)[:4] + "*" * (len(m.group(2)) - 4),
+            text,
+        )
 
         # Mask organization IDs (common format: long numeric or alphanum strings)
-        # Typically in headers like X-Org-ID or X-Cloud-Org-ID
-        import re
-
+        # Show only LAST 4 chars (e.g., "12345678901234567890" -> "***************7890")
         # Mask long alphanumeric strings that look like org IDs (20+ chars)
-        text = re.sub(r"\b([A-Z0-9]{20,})\b", lambda m: m.group(1)[:8] + "*" * 12, text)
+        # Keep only last 4 visible
+        text = re.sub(r"\b([A-Z0-9]{20,})\b", lambda m: "*" * (len(m.group(1)) - 4) + m.group(1)[-4:], text)
+
+        # Mask query params containing tokens (e.g., "?token=xxx&..." -> "?token=***")
+        # Preserve the key, mask only the value
+        text = re.sub(r"([?&])(token|oauth|access_token|refresh_token|api_key|secret)=([^&\s]*)", r"\1\2=***", text)
+
+        # Remove Authorization header entirely (mask the entire value)
+        # Pattern matches "Authorization: Bearer *** or similar auth headers
+        text = re.sub(r"(Authorization[\"']?\s*[:=]\s*[\"']?)[^\s\"']+", r"\1***", text)
 
         return text
 
