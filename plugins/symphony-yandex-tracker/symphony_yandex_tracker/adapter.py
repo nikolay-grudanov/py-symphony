@@ -25,11 +25,11 @@ if str(_project_root) not in sys.path:
 
 try:
     from runtime.tracker.base import TrackerClient
-    from runtime.tracker.normalization import NormalizationUtils  # type: ignore[import-not-found]
+    from runtime.tracker.normalization import NormalizationUtils
 except ImportError:
     # Fallback: runtime module not available
-    TrackerClient = object  # type: ignore[assignment]
-    NormalizationUtils = None
+    TrackerClient = object  # type: ignore[assignment, misc]
+    NormalizationUtils = None  # type: ignore[assignment]
 
 # Default endpoint for Yandex Tracker API v3
 DEFAULT_ENDPOINT = "https://api.tracker.yandex.net/v3"
