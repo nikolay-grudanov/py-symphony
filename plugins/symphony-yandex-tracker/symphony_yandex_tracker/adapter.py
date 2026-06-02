@@ -6,6 +6,9 @@ Classes:
     YandexTrackerAdapter: Main adapter class for Yandex Tracker.
 """
 
+import sys
+import traceback
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -13,6 +16,18 @@ import httpx
 from symphony_yandex_tracker import errors, models
 from symphony_yandex_tracker import http_client as http_client_module
 from symphony_yandex_tracker import logger as logger_module
+
+# Import normalization utilities from runtime (T026)
+# Add project root to path if not already available
+_project_root = Path(__file__).resolve().parents[3]
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+try:
+    from runtime.tracker.normalization import NormalizationUtils  # type: ignore[import-not-found]
+except ImportError:
+    # Fallback: runtime module not available
+    NormalizationUtils = None
 
 # Default endpoint for Yandex Tracker API v3
 DEFAULT_ENDPOINT = "https://api.tracker.yandex.net/v3"
@@ -60,13 +75,13 @@ class YandexTrackerAdapter:
             X-Cloud-Org-ID headers. Must be non-empty for fetching candidate issues.
     """
 
-    # Plugin metadata for discovery (FR-025)
+    # Plugin metadata for discovery (FR-025, US8)
     __plugin_info__: dict[str, str] = {
         "name": "symphony-yandex-tracker",
         "version": "0.1.0",
         "tracker_kind": "yandex_tracker",
-        "description": "Yandex Tracker adapter for Symphony orchestration platform",
-        "author": "Symphony Team",
+        "description": "Yandex Tracker integration adapter for Symphony orchestration platform",
+        "author": "py-symphony team",
     }
 
     def __init__(
@@ -276,20 +291,37 @@ class YandexTrackerAdapter:
         # Default to oauth for unrecognized tokens (T017)
         return "oauth"
 
-    def fetch_candidate_issues(self) -> list[dict[str, Any]]:
+    def fetch_candidate_issues(
+        self,
+        per_page: int = 50,
+        page: int = 1,
+    ) -> list[dict[str, Any]]:
         """Fetch candidate issues for orchestration.
 
         Fetches issues from the configured queue that are in active states.
         These are issues that could potentially be dispatched to agent execution.
 
+        Args:
+            per_page: Number of issues per page (default: 50).
+            page: Page number to fetch (default: 1).
+
         Returns:
-            List of normalized issue dictionaries.
+            List of normalized issue dictionaries with fields:
+                - id: Issue internal ID
+                - identifier: Issue key (e.g., "BACKEND-123")
+                - title: Issue summary/title
+                - state: Current status/state
+                - priority: Priority level
+                - created_at: Creation timestamp
+                - labels: Issue tags/labels
+                - blocked_by: List of blocking issues
 
         Raises:
-            errors.ConfigurationError: If project_slug is not set.
+            errors.ConfigurationError: If project_slug is not set (T024).
             errors.TrackerApiError: If API request fails.
             errors.TrackerTimeoutError: If request times out.
         """
+        # T024: Validate project_slug is not empty
         if not self._project_slug:
             raise errors.ConfigurationError(
                 message="project_slug is required for fetching candidate issues",
@@ -300,32 +332,41 @@ class YandexTrackerAdapter:
             try:
                 client = self._get_http_client()
 
-                # Build query parameters
+                # T025: Build query parameters with pagination
                 params: dict[str, Any] = {
                     "queue": self._project_slug,
-                    "perPage": 100,
+                    "perPage": per_page,
+                    "page": page,
                 }
 
-                # Filter by active states
+                # Filter by active states - Yandex Tracker API filter syntax
                 if self._active_states:
-                    # Yandex Tracker API uses status specific filtering
-                    # We'll fetch all and filter locally for simplicity
-                    pass
+                    # Use status filtering with "in" operator
+                    # Format: status in (open, in_progress)
+                    status_filter = ", ".join(self._active_states)
+                    params["filter"] = f"status in ({status_filter})"
 
                 response = client.get("/v2/issues", params=params)
 
                 if response.status_code == 200:
-                    issues: list[dict[str, Any]] = response.json()
+                    raw_issues: list[dict[str, Any]] = response.json()
+
+                    # T026: Normalize issues using runtime utilities
+                    normalized_issues = self._normalize_issues(raw_issues)
+
                     self._logger.info(
-                        f"Fetched {len(issues)} candidate issues",
+                        f"Fetched {len(normalized_issues)} candidate issues",
                         extra={
                             "action": "fetch_candidate_issues",
                             "outcome": "success",
                             "duration_ms": timer.get_duration_ms(),
-                            "issue_count": len(issues),
+                            "issue_count": len(normalized_issues),
+                            "project_slug": self._project_slug,
+                            "per_page": per_page,
+                            "page": page,
                         },
                     )
-                    return issues
+                    return normalized_issues
                 else:
                     raise errors.TrackerApiError(
                         message=f"Failed to fetch issues: {response.status_code}",
@@ -340,11 +381,13 @@ class YandexTrackerAdapter:
                         "outcome": "error",
                         "duration_ms": timer.get_duration_ms(),
                         "error_message": str(e),
+                        "project_slug": self._project_slug,
                     },
                 )
                 raise errors.TrackerTimeoutError(
                     message=f"Request timed out: {e}",
                     timeout=float(self._timeout),
+                    url=f"{self._endpoint}/v2/issues",
                 )
             except httpx.HTTPError as e:
                 self._logger.error(
@@ -354,9 +397,134 @@ class YandexTrackerAdapter:
                         "outcome": "error",
                         "duration_ms": timer.get_duration_ms(),
                         "error_message": str(e),
+                        "project_slug": self._project_slug,
                     },
                 )
                 raise errors.TrackerApiError(message=f"HTTP error: {e}")
+
+    def _normalize_issues(
+        self,
+        raw_issues: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Normalize raw Yandex Tracker issues to common format.
+
+        Args:
+            raw_issues: List of raw issue dictionaries from Yandex Tracker API.
+
+        Returns:
+            List of normalized issue dictionaries.
+
+        Note:
+            T026: Normalization maps Yandex Tracker fields to normalized format:
+            - self -> id (extracted from URL)
+            - key -> identifier
+            - summary -> title
+            - status -> state
+            - priority -> priority
+            - createdAt -> created_at
+            - tags -> labels
+            - dependencies -> blocked_by
+        """
+        if not raw_issues:
+            return []
+
+        # Use runtime normalization if available
+        if NormalizationUtils is not None:
+            try:
+                return [NormalizationUtils.normalize_issue(self._normalize_yandex_issue(issue)) for issue in raw_issues]
+            except (ImportError, AttributeError, ValueError) as e:
+                # Issue #1 & #4: Log the fallback instead of silent pass
+                self._logger.warning(
+                    f"Runtime normalization failed ({e}), using internal normalization",
+                    extra={"action": "normalize_issues", "outcome": "fallback"},
+                )
+
+        # Fallback: internal normalization
+        normalized = []
+        for issue in raw_issues:
+            normalized_issue = self._normalize_yandex_issue(issue)
+            # Skip empty issues (invalid issues without identifiers)
+            if normalized_issue:
+                normalized.append(normalized_issue)
+
+        return normalized
+
+    def _normalize_yandex_issue(self, raw_issue: dict[str, Any]) -> dict[str, Any]:
+        """Normalize a single Yandex Tracker issue to common format.
+
+        Args:
+            raw_issue: Raw issue from Yandex Tracker API.
+
+        Returns:
+            Normalized issue dictionary.
+        """
+        # Extract ID from self URL
+        issue_id = None
+        self_url = raw_issue.get("self", "")
+        if self_url:
+            # Extract ID from URL like https://api.tracker.yandex.net/v2/issues/123
+            parts = self_url.rstrip("/").split("/")
+            if parts:
+                issue_id = parts[-1]
+
+        # Extract status name
+        status = raw_issue.get("status", {})
+        state = ""
+        if isinstance(status, dict):
+            state = status.get("name", "") or status.get("key", "")
+        elif status:
+            state = str(status)
+
+        # Extract priority
+        priority = raw_issue.get("priority", {})
+        priority_value = None
+        if isinstance(priority, dict):
+            # Try key first, then name
+            priority_key = priority.get("key") or priority.get("name")
+            if priority_key:
+                priority_map = {
+                    "critical": 1,
+                    "high": 2,
+                    "medium": 3,
+                    "low": 4,
+                }
+                priority_value = priority_map.get(str(priority_key).lower(), 3)
+        elif priority:
+            priority_value = priority
+
+        # Extract labels/tags
+        labels = raw_issue.get("tags", [])
+        if not labels:
+            labels = []
+
+        # Extract blocked_by/dependencies
+        blocked_by = raw_issue.get("dependencies", [])
+        if not blocked_by:
+            blocked_by = []
+        # Extract just IDs from dependencies
+        if blocked_by:
+            blocked_by = [dep.get("id", "") for dep in blocked_by if dep.get("id")]
+
+        # Issue #2: Validate that at least one identifier is present
+        issue_id_value = issue_id or raw_issue.get("id")
+        issue_key_value = raw_issue.get("key")
+        if not (issue_id_value or issue_key_value):
+            self._logger.warning(
+                f"Issue missing all identifiers, skipping: {raw_issue}",
+                extra={"action": "normalize_issue", "outcome": "skip"},
+            )
+            return {}  # Return empty dict for invalid issues
+
+        return {
+            "id": issue_id_value,
+            "identifier": issue_key_value or "",
+            "title": raw_issue.get("summary", ""),
+            "state": state.lower().strip() if state else "",
+            "priority": priority_value,
+            "created_at": raw_issue.get("createdAt", ""),
+            "labels": labels,
+            "blocked_by": blocked_by,
+        }
 
     def fetch_issues_by_state(self, states: list[str]) -> list[dict[str, Any]]:
         """Fetch issues filtered by state list.
@@ -370,7 +538,9 @@ class YandexTrackerAdapter:
         Raises:
             errors.ConfigurationError: If project_slug is not set.
             errors.TrackerApiError: If API request fails.
+            errors.TrackerTimeoutError: If request times out.
         """
+        # T031: Validate project_slug is not empty
         if not self._project_slug:
             raise errors.ConfigurationError(
                 message="project_slug is required for fetching issues",
@@ -380,39 +550,117 @@ class YandexTrackerAdapter:
         if not states:
             return []
 
+        # Validate content of the list
+        validated_states = []
+        for state in states:
+            if not isinstance(state, str):
+                raise errors.ValidationError(
+                    message=f"State must be string, got {type(state).__name__}",
+                    field="states",
+                    constraint="list of strings",
+                )
+            if not state.strip():
+                # Skip empty strings with warning
+                self._logger.warning(
+                    "Skipping empty state in states list",
+                    extra={"action": "fetch_issues_by_state", "outcome": "warning"},
+                )
+                continue
+            validated_states.append(state.strip())
+
+        if not validated_states:
+            return []
+
         with logger_module.OperationTimer() as timer:
             try:
                 client = self._get_http_client()
 
-                params: dict[str, Any] = {
-                    "queue": self._project_slug,
-                    "perPage": 100,
-                }
+                # T031: Server-side filtering using API and pagination
+                all_normalized_issues: list[dict[str, Any]] = []
+                page = 1
+                per_page = 50
+                total_pages = 0  # Track total pages for logging
 
-                response = client.get("/v2/issues", params=params)
+                while True:
+                    total_pages += 1  # Increment at the beginning of each iteration
+                    params: dict[str, Any] = {
+                        "queue": self._project_slug,
+                        "perPage": per_page,
+                        "page": page,
+                    }
 
-                if response.status_code == 200:
-                    all_issues = response.json()
-                    # Filter by states locally
-                    filtered = [issue for issue in all_issues if issue.get("status", {}).get("name") in states]
-                    self._logger.info(
-                        f"Fetched {len(filtered)} issues by state",
-                        extra={
-                            "action": "fetch_issues_by_state",
-                            "outcome": "success",
-                            "duration_ms": timer.get_duration_ms(),
-                            "states": states,
-                            "issue_count": len(filtered),
-                        },
-                    )
-                    return filtered
-                else:
-                    raise errors.TrackerApiError(
-                        message=f"Failed to fetch issues: {response.status_code}",
-                        status_code=response.status_code,
-                        response_body=response.text,
-                    )
+                    # T031: Filter by states using API - use status filtering with "in" operator
+                    # Format: status in (open, in_progress)
+                    # Convert human-readable state names to API keys (lowercase, spaces to underscores)
+                    status_keys = [state.lower().replace(" ", "_").replace("-", "_") for state in validated_states]
+                    status_filter = ", ".join(status_keys)
+                    params["filter"] = f"status in ({status_filter})"
+
+                    response = client.get("/v2/issues", params=params)
+
+                    if response.status_code != 200:
+                        raise errors.TrackerApiError(
+                            message=f"Failed to fetch issues: {response.status_code}",
+                            status_code=response.status_code,
+                            response_body=response.text,
+                        )
+
+                    raw_issues: list[dict[str, Any]] = response.json()
+
+                    # T031: Normalize issues using runtime utilities
+                    if raw_issues:
+                        normalized_issues = self._normalize_issues(raw_issues)
+                        all_normalized_issues.extend(normalized_issues)
+
+                    # T031: Pagination - check if we got full page
+                    if len(raw_issues) < per_page:
+                        break
+                    page += 1
+
+                # T031: Client-side filtering to ensure exact state matching
+                # (handles edge cases where API may return extra issues)
+                state_names_lower = {s.lower() for s in validated_states}
+                filtered_issues = [
+                    issue for issue in all_normalized_issues if issue.get("state", "").lower() in state_names_lower
+                ]
+
+                # T031: Log successful fetch with structured logging
+                self._logger.info(
+                    f"Fetched {len(filtered_issues)} issues by state",
+                    extra={
+                        "action": "fetch_issues_by_state",
+                        "outcome": "success",
+                        "duration_ms": timer.get_duration_ms(),
+                        "states": validated_states,
+                        "issue_count": len(filtered_issues),
+                        "project_slug": self._project_slug,
+                        "per_page": per_page,
+                        "page": total_pages,  # Use correct page count
+                    },
+                )
+                return filtered_issues
+
+            except httpx.TimeoutException as e:
+                # T031: Handle timeout error with structured logging
+                self._logger.error(
+                    f"Fetch issues by state timeout: {e}",
+                    extra={
+                        "action": "fetch_issues_by_state",
+                        "outcome": "error",
+                        "duration_ms": timer.get_duration_ms(),
+                        "error_message": str(e),
+                        "stack_trace": traceback.format_exc(),
+                        "project_slug": self._project_slug,
+                        "states": validated_states,
+                    },
+                )
+                raise errors.TrackerTimeoutError(
+                    message=f"Request timed out: {e}",
+                    timeout=float(self._timeout),
+                    url=f"{self._endpoint}/v2/issues",
+                )
             except httpx.HTTPError as e:
+                # T031: Handle HTTP error with structured logging
                 self._logger.error(
                     f"Fetch issues by state error: {e}",
                     extra={
@@ -420,9 +668,26 @@ class YandexTrackerAdapter:
                         "outcome": "error",
                         "duration_ms": timer.get_duration_ms(),
                         "error_message": str(e),
+                        "stack_trace": traceback.format_exc(),
+                        "project_slug": self._project_slug,
+                        "states": validated_states,
                     },
                 )
                 raise errors.TrackerApiError(message=f"HTTP error: {e}")
+            except Exception as e:
+                self._logger.error(
+                    f"Unexpected error fetching issues by state: {e}",
+                    extra={
+                        "action": "fetch_issues_by_state",
+                        "outcome": "error",
+                        "duration_ms": timer.get_duration_ms(),
+                        "error_message": str(e),
+                        "stack_trace": traceback.format_exc(),
+                        "project_slug": self._project_slug,
+                        "states": validated_states,
+                    },
+                )
+                raise errors.TrackerApiError(message=f"Unexpected error: {e}")
 
     def fetch_issue_states_by_ids(self, issue_ids: list[str]) -> dict[str, str]:
         """Fetch current states for specific issue IDs.

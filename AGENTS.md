@@ -119,3 +119,10 @@ mix test test/symphony_elixir/some_test.exs
 # Диагностика workspace
 ls -la ./workspaces/
 ```
+
+## Active Technologies
+- Python 3.11+ (required by constitution) (001)
+- N/A (adapter is stateless, all data comes from Yandex Tracker API) (001)
+
+## Recent Changes
+- 001: Added Python 3.11+ (required by constitution)
