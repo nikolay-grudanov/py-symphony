@@ -6,8 +6,9 @@ Classes:
     YandexTrackerAdapter: Main adapter class for Yandex Tracker.
 """
 
+import sys
 import traceback
-from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -16,55 +17,19 @@ from symphony_yandex_tracker import errors, models
 from symphony_yandex_tracker import http_client as http_client_module
 from symphony_yandex_tracker import logger as logger_module
 
-# Per constitution §plugin isolation: this plugin does NOT import from runtime/.
-# Local timestamp parsing here covers the common Yandex Tracker ISO-8601 formats.
+# Import normalization utilities from runtime (T026)
+# Add project root to path if not already available
+_project_root = Path(__file__).resolve().parents[3]
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
-
-def _parse_iso_timestamp(value: Any) -> datetime | None:
-    """Parse an ISO-8601 timestamp string into a ``datetime``.
-
-    Accepts the common Yandex Tracker variants:
-    - ``"2024-05-01T12:34:56.000+00:00"`` (with millis + tz)
-    - ``"2024-05-01T12:34:56Z"``
-    - ``"2024-05-01T12:34:56"``
-    - ``"2024-05-01"``
-
-    Returns ``None`` for empty input or unparseable values (never raises).
-    """
-    if not value:
-        return None
-    if isinstance(value, datetime):
-        return value
-    if not isinstance(value, str):
-        return None
-
-    s = value.strip()
-    if not s:
-        return None
-
-    # Normalize trailing Z → +00:00 for fromisoformat
-    if s.endswith("Z"):
-        s = s[:-1] + "+00:00"
-
-    # Drop timezone offset suffix: fromisoformat in 3.11+ accepts +00:00,
-    # but be defensive and try without tz first.
-    for suffix in ("+00:00", "-00:00"):
-        if s.endswith(suffix):
-            s = s[: -len(suffix)]
-            break
-
-    try:
-        dt = datetime.fromisoformat(s)
-    except ValueError:
-        for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
-            try:
-                return datetime.strptime(s, fmt)
-            except ValueError:
-                continue
-        return None
-
-    return dt
-
+try:
+    from runtime.tracker.base import TrackerClient
+    from runtime.tracker.normalization import NormalizationUtils
+except ImportError:
+    # Fallback: runtime module not available
+    TrackerClient = object  # type: ignore[assignment, misc]
+    NormalizationUtils = None  # type: ignore[assignment]
 
 # Default endpoint for Yandex Tracker API v3
 DEFAULT_ENDPOINT = "https://api.tracker.yandex.net/v3"
@@ -73,7 +38,7 @@ DEFAULT_ENDPOINT = "https://api.tracker.yandex.net/v3"
 DEFAULT_ACTIVE_STATES = ["open", "in_progress"]
 
 
-class YandexTrackerAdapter:
+class YandexTrackerAdapter(TrackerClient):
     """Adapter for Yandex Tracker API v3.
 
     This class provides an interface for interacting with Yandex Tracker issue
@@ -85,6 +50,7 @@ class YandexTrackerAdapter:
 
     Attributes:
         tracker_type: Always returns "yandex_tracker".
+        tracker_kind: Always returns "yandex_tracker".
         endpoint: Base URL for Yandex Tracker API v3.
         api_key: OAuth or IAM token for authentication.
         timeout: Request timeout in seconds.
@@ -179,6 +145,15 @@ class YandexTrackerAdapter:
 
         Returns:
             Always returns "yandex_tracker" (FR-003).
+        """
+        return "yandex_tracker"
+
+    @property
+    def tracker_kind(self) -> str:
+        """Return the tracker kind identifier (TrackerClient interface).
+
+        Returns:
+            Always returns "yandex_tracker".
         """
         return "yandex_tracker"
 
@@ -465,10 +440,18 @@ class YandexTrackerAdapter:
         if not raw_issues:
             return []
 
-        # Per constitution §plugin isolation: this plugin does NOT import from
-        # runtime/. The runtime orchestrator can post-process the returned dicts
-        # if it wants shared normalization; the plugin only emits Yandex-Tracker-
-        # shaped issues.
+        # Use runtime normalization if available
+        if NormalizationUtils is not None:
+            try:
+                return [NormalizationUtils.normalize_issue(self._normalize_yandex_issue(issue)) for issue in raw_issues]
+            except (ImportError, AttributeError, ValueError) as e:
+                # Issue #1 & #4: Log the fallback instead of silent pass
+                self._logger.warning(
+                    f"Runtime normalization failed ({e}), using internal normalization",
+                    extra={"action": "normalize_issues", "outcome": "fallback"},
+                )
+
+        # Fallback: internal normalization
         normalized = []
         for issue in raw_issues:
             normalized_issue = self._normalize_yandex_issue(issue)
@@ -550,7 +533,7 @@ class YandexTrackerAdapter:
             "title": raw_issue.get("summary", ""),
             "state": state.lower().strip() if state else "",
             "priority": priority_value,
-            "created_at": _parse_iso_timestamp(raw_issue.get("createdAt", "")),
+            "created_at": raw_issue.get("createdAt", ""),
             "labels": labels,
             "blocked_by": blocked_by,
         }
@@ -717,6 +700,19 @@ class YandexTrackerAdapter:
                     },
                 )
                 raise errors.TrackerApiError(message=f"Unexpected error: {e}")
+
+    def fetch_issues_by_states(self, state_names: list[str]) -> list[dict[str, Any]]:
+        """Fetch issues matching the specified states (TrackerClient interface).
+
+        Delegates to fetch_issues_by_state for backward compatibility.
+
+        Args:
+            state_names: List of state names to filter by.
+
+        Returns:
+            List of normalized issue dictionaries.
+        """
+        return self.fetch_issues_by_state(state_names)
 
     def fetch_issue_states_by_ids(self, issue_ids: list[str]) -> dict[str, str]:
         """Fetch current states for specific issue IDs.

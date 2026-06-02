@@ -47,11 +47,7 @@ indent-width = 4
 
 [tool.ruff.lint]
 select = ['E', 'F', 'W', 'I', 'N', 'UP', 'B', 'C4', 'ANN']
-# ANN001 (missing arg type) and ANN202 (missing return type) are allowed in tests
-# because the [[tool.mypy.overrides]] for tests.* is ignored when mypy --strict is set
-# at the project level. Allowing these in ruff keeps style consistent with mypy.
-# ANN101/ANN102 are obsolete in modern ruff (implicit self/cls typing); ignore is a no-op.
-ignore = ['ANN201', 'ANN401', 'ANN001', 'ANN202', 'N815', 'B904', 'UP017']
+ignore = ['ANN101', 'ANN102', 'ANN201', 'ANN401', 'N815', 'B904', 'UP017']
 
 [tool.ruff.format]
 quote-style = 'double'
@@ -60,49 +56,14 @@ line-ending = 'auto'
 
 [tool.mypy]
 python_version = '3.11'
+strict = true
 warn_return_any = true
 warn_unused_ignores = true
-# Strict mode is set per-target below (plugin source = strict, tests = relaxed).
-# Reason: mypy 1.20+ does NOT honour per-file `disallow_untyped_defs = false`
-# overrides when project-level `strict = true` is set. Setting strict here
-# would force type annotations on every test helper, which is what the original
-# t_04283525 / t_61f66531 block found to be impractical. Production code is
-# still fully strict; tests get `no-untyped-def` disabled.
-strict = false
 disallow_untyped_defs = true
-disallow_any_generics = true
-disallow_subclassing_any = true
-disallow_untyped_calls = true
-disallow_untyped_decorators = true
-disallow_incomplete_defs = true
-disallow_explicit_any = true
-warn_redundant_casts = true
-warn_unused_configs = true
-extra_checks = true
-no_implicit_optional = true
-no_implicit_reexport = true
-strict_equality = true
-strict_concatenate = true
-
-[[tool.mypy.overrides]]
-module = 'symphony_yandex_tracker.*'
-strict = true
-disallow_untyped_defs = true
-disallow_any_generics = true
-disallow_subclassing_any = true
-disallow_untyped_calls = true
-disallow_incomplete_defs = true
-disallow_explicit_any = true
-warn_redundant_casts = true
-warn_unused_configs = true
-no_implicit_optional = true
-no_implicit_reexport = true
-strict_equality = true
 
 [[tool.mypy.overrides]]
 module = 'tests.*'
 disallow_untyped_defs = false
-disable_error_code = ['no-untyped-def', 'no-untyped-call']
 
 [project.entry-points.'symphony.trackers']
 yandex_tracker = 'symphony_yandex_tracker.adapter:YandexTrackerAdapter'

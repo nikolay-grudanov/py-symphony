@@ -1,0 +1,132 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agents": {
+    // ============================================
+    // ORCHESTRATOR (M2.7 - самая мощная)
+    // ============================================
+    "build-orchestrator": {
+      "description": "Координация выполнения задач, управление workflow, распределение задач между агентами",
+      "mode": "primary",
+      "model": "minimax/minimax-2.7",
+      "temperature": 0.7,
+      "max_steps": 50,
+      "prompt_path": "./agents/build-orchestrator/ROLE.md"
+    },
+
+    // ============================================
+    // ARCHITECTS & VERIFICATION (M2.5)
+    // ============================================
+    "platform-architect": {
+      "description": "Архитектурные решения для платформы, системный дизайн",
+      "mode": "subagent",
+      "model": "minimax/minimax-2.5",
+      "temperature": 0.5,
+      "max_steps": 30,
+      "prompt_path": "./agents/platform-architect/ROLE.md"
+    },
+    "agent-runtime-architect": {
+      "description": "Протоколы взаимодействия, runtime архитектура, subprocess management",
+      "mode": "subagent",
+      "model": "minimax/minimax-2.5",
+      "temperature": 0.5,
+      "max_steps": 30,
+      "prompt_path": "./agents/agent-runtime-architect/ROLE.md"
+    },
+    "integration-architect": {
+      "description": "API контракты, интеграции, взаимодействие между компонентами",
+      "mode": "subagent",
+      "model": "minimax/minimax-2.5",
+      "temperature": 0.5,
+      "max_steps": 25,
+      "prompt_path": "./agents/integration-architect/ROLE.md"
+    },
+    "workflow-architect": {
+      "description": "Дизайн workflow процессов, планирование задач",
+      "mode": "subagent",
+      "model": "minimax/minimax-2.5",
+      "temperature": 0.5,
+      "max_steps": 25,
+      "prompt_path": "./agents/workflow-architect/ROLE.md"
+    },
+    "verification-agent": {
+      "description": "Верификация артефактов против требований и спецификаций",
+      "mode": "subagent",
+      "model": "minimax/minimax-2.5",
+      "temperature": 0.4,
+      "max_steps": 20,
+      "prompt_path": "./agents/verification-agent/ROLE.md"
+    },
+    "code-reviewer": {
+      "description": "Code review: безопасность, качество, производительность",
+      "mode": "subagent",
+      "model": "minimax/minimax-2.5",
+      "temperature": 0.3,
+      "max_steps": 20,
+      "prompt_path": "./agents/code-reviewer/ROLE.md"
+    },
+
+    // ============================================
+    // EXECUTORS (M2.1 - быстрые, точные)
+    // ============================================
+    "implementation-engineer": {
+      "description": "Реализация кода по спецификациям и ADR",
+      "mode": "subagent",
+      "model": "minimax/minimax-2.1",
+      "temperature": 0.3,
+      "max_steps": 40,
+      "prompt_path": "./agents/implementation-engineer/ROLE.md"
+    },
+    "python-coder": {
+      "description": "Python разработка: модули, функции, data science, async",
+      "mode": "subagent",
+      "model": "minimax/minimax-2.1",
+      "temperature": 0.3,
+      "max_steps": 30,
+      "prompt_path": "./agents/python-coder/ROLE.md"
+    },
+    "test-engineer": {
+      "description": "Test strategy, unit/integration/e2e tests, QA",
+      "mode": "subagent",
+      "model": "minimax/minimax-2.1",
+      "temperature": 0.3,
+      "max_steps": 25,
+      "prompt_path": "./agents/test-engineer/ROLE.md"
+    },
+    "documentation-writer": {
+      "description": "Создание и поддержка документации, README, API docs",
+      "mode": "subagent",
+      "model": "minimax/minimax-2.1",
+      "temperature": 0.3,
+      "max_steps": 20,
+      "prompt_path": "./agents/documentation-writer/ROLE.md"
+    },
+    "researcher": {
+      "description": "Веб-исследование, поиск информации, анализ документации",
+      "mode": "subagent",
+      "model": "minimax/minimax-2.1",
+      "temperature": 0.8,
+      "max_steps": 15,
+      "prompt_path": "./agents/researcher/ROLE.md"
+    },
+
+    // ============================================
+    // PLUGINS (M2.1)
+    // ============================================
+    "opencode-plugin-js": {
+      "description": "JavaScript плагины для opencode",
+      "mode": "subagent",
+      "model": "minimax/minimax-2.1",
+      "temperature": 0.3,
+      "max_steps": 25,
+      "prompt_path": "./agents/opencode-plugin-js/ROLE.md"
+    },
+    "opencode-plugin-reviewer": {
+      "description": "Ревью opencode плагинов",
+      "mode": "subagent",
+      "model": "minimax/minimax-2.1",
+      "temperature": 0.3,
+      "max_steps": 15,
+      "prompt_path": "./agents/opencode-plugin-reviewer/ROLE.md"
+    }
+  }
+}

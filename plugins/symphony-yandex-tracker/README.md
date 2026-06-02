@@ -99,11 +99,47 @@ mypy .
 
 ## Plugin Information
 
-This plugin is auto-discovered via entry points in the `symphony.trackers` group. The adapter class provides metadata through the `__plugin_info__` attribute.
+This plugin is auto-discovered via entry points in the `symphony.trackers` group.
+The adapter class provides metadata through the `__plugin_info__` class attribute.
 
-- **Tracker Kind**: `yandex_tracker`
-- **Version**: 0.1.0
-- **Entry Point**: `symphony_yandex_tracker.adapter:YandexTrackerAdapter`
+### `__plugin_info__` Structure
+
+The adapter class defines a `__plugin_info__` dictionary with the following fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `str` | Plugin package name: `"symphony-yandex-tracker"` |
+| `version` | `str` | Plugin version: `"0.1.0"` |
+| `tracker_kind` | `str` | Tracker kind identifier: `"yandex_tracker"` |
+| `description` | `str` | Human-readable plugin description |
+| `author` | `str` | Plugin author/team: `"py-symphony team"` |
+
+### Entry Points
+
+```toml
+[project.entry-points."symphony.trackers"]
+yandex_tracker = "symphony_yandex_tracker.adapter:YandexTrackerAdapter"
+```
+
+When `TrackerRegistry.discover_from_entry_points()` is called, it:
+1. Scans `symphony.trackers` entry point group
+2. Loads each adapter class via `importlib.metadata.entry_points()`
+3. Validates the class is a `TrackerClient` subclass
+4. Extracts metadata from `__plugin_info__`
+5. Registers the adapter with `source="entry_point"`
+
+### TrackerClient Interface
+
+The adapter implements the `TrackerClient` interface from `runtime.tracker.base`:
+- `tracker_kind` → returns `"yandex_tracker"`
+- `authenticate()` → validates API token
+- `fetch_candidate_issues()` → returns active issues
+- `fetch_issues_by_states(states)` → filters issues by state
+- `get_issue(key)` → single issue lookup
+- `update_issue(key, ...)` → update issue fields
+- `add_comment(key, text)` → add comment
+- `list_transitions(key)` → available transitions
+- `transition_issue(key, transition_id)` → execute transition
 
 ## License
 

@@ -12,14 +12,13 @@ User Story 1 Goal:
 Enable Symphony orchestration platform to configure Yandex Tracker as issue tracking system.
 """
 
-from pathlib import Path
 from unittest.mock import Mock, patch
 
-import httpx
 import pytest
-import tomli
+import httpx
 
-from symphony_yandex_tracker import errors, models
+from symphony_yandex_tracker import errors
+from symphony_yandex_tracker import models
 from symphony_yandex_tracker.adapter import YandexTrackerAdapter
 
 
@@ -456,10 +455,7 @@ class TestUserStory3FetchIssuesByState:
             assert issue["title"] == "Test issue"
             assert issue["state"] == "open"  # normalized to lowercase
             assert issue["priority"] is not None
-            # created_at is returned as datetime object
-            assert issue["created_at"].year == 2024
-            assert issue["created_at"].month == 1
-            assert issue["created_at"].day == 15
+            assert issue["created_at"] == "2024-01-15T10:30:00Z"
             assert issue["labels"] == ["test"]
             assert issue["blocked_by"] == ["TEST-99"]
 
@@ -2744,22 +2740,18 @@ class TestUserStory8PluginRegistration:
     # T066: Test entry point exists in symphony.trackers group
     def test_t066_entry_point_exists_in_symphony_trackers_group(self):
         """Test T066: Entry point exists in symphony.trackers group."""
-        # Load pyproject.toml directly to verify entry point declaration
-        pyproject_path = Path(__file__).parent.parent / "pyproject.toml"
-        with pyproject_path.open("rb") as f:
-            config = tomli.load(f)
+        from importlib.metadata import entry_points
 
-        # Verify entry points section exists
-        assert "project" in config
-        assert "entry-points" in config["project"]
-        assert "symphony.trackers" in config["project"]["entry-points"]
+        # Get entry points for symphony.trackers group
+        eps = entry_points(group="symphony.trackers")
 
-        # Verify yandex_tracker entry point is declared
-        eps = config["project"]["entry-points"]["symphony.trackers"]
-        assert "yandex_tracker" in eps
+        # Verify yandex_tracker entry point exists (convert to dict for compatibility)
+        ep_dict = {ep.name: ep for ep in eps}
+        assert "yandex_tracker" in ep_dict
 
         # Verify it points to correct class
-        assert eps["yandex_tracker"] == "symphony_yandex_tracker.adapter:YandexTrackerAdapter"
+        ep = ep_dict["yandex_tracker"]
+        assert ep.value == "symphony_yandex_tracker.adapter:YandexTrackerAdapter"
 
     # T067: Test YandexTrackerAdapter is importable
     def test_t067_yandex_tracker_adapter_is_importable(self):
@@ -2798,3 +2790,107 @@ class TestUserStory8PluginRegistration:
 
         # Verify tracker_kind matches entry point name
         assert plugin_info["tracker_kind"] == "yandex_tracker"
+
+
+# =============================================================================
+# User Story 9: Plugin Auto-Discovery (T072-T074)
+# =============================================================================
+# These tests verify automatic discovery and registration of Yandex Tracker
+# adapter via platform's plugin system without manual configuration.
+#
+# Test Tasks:
+# - T072: Test TrackerRegistry discovers YandexTrackerAdapter
+# - T073: Test plugin metadata is correctly extracted from __plugin_info__
+# - T074: Test tracker.kind="yandex_tracker" in WORKFLOW.md instantiates adapter
+# =============================================================================
+
+
+class TestUserStory9PluginAutoDiscovery:
+    """Test suite for User Story 9: Plugin Auto-Discovery.
+
+    These tests verify that the TrackerRegistry can discover the YandexTrackerAdapter
+    via entry points and that metadata is correctly extracted.
+
+    Test Tasks:
+    - T072: Test TrackerRegistry discovers YandexTrackerAdapter when discover_from_entry_points() is called
+    - T073: Test plugin metadata is correctly extracted from __plugin_info__ attribute
+    - T074: Test valid tracker.kind="yandex_tracker" in WORKFLOW.md successfully instantiates adapter
+    """
+
+    # T072: Test TrackerRegistry discovers YandexTrackerAdapter
+    def test_t072_tracker_registry_discovers_yandex_tracker_adapter(self):
+        """Test T072: TrackerRegistry discovers YandexTrackerAdapter when discover_from_entry_points() is called.
+
+        Test case: TrackerRegistry.discover_from_entry_points() finds and registers yandex_tracker adapter
+        Verify: adapter is discovered and registered in registry
+        Verify: registry get_adapter('yandex_tracker') returns AdapterInfo
+        Verify: AdapterInfo.source == 'entry_point'
+        """
+        from runtime.tracker.registry import TrackerRegistry, get_tracker_registry
+
+        # Create a fresh registry to avoid interference from existing registrations
+        registry = TrackerRegistry()
+
+        # Discover entry points
+        registry.discover_from_entry_points()
+
+        # Verify yandex_tracker is in the available adapters
+        adapter_info = registry.get_adapter("yandex_tracker")
+        assert adapter_info is not None, "yandex_tracker adapter should be discovered"
+        assert adapter_info.kind == "yandex_tracker"
+        assert adapter_info.source == "entry_point"
+
+    # T073: Test plugin metadata is correctly extracted from __plugin_info__
+    def test_t073_plugin_metadata_extracted_from_plugin_info(self):
+        """Test T073: Plugin metadata is correctly extracted from __plugin_info__ attribute.
+
+        Test case: metadata from __plugin_info__ is correctly extracted
+        Verify: metadata contains name, version, tracker_kind, description, author
+        Verify: metadata values match the __plugin_info__ attribute values
+        """
+        from runtime.tracker.registry import TrackerRegistry
+        from symphony_yandex_tracker.adapter import YandexTrackerAdapter
+
+        registry = TrackerRegistry()
+        registry.discover_from_entry_points()
+
+        adapter_info = registry.get_adapter("yandex_tracker")
+        assert adapter_info is not None
+
+        # Verify metadata matches __plugin_info__
+        expected_metadata = YandexTrackerAdapter.__plugin_info__
+        assert adapter_info.metadata == expected_metadata
+        assert adapter_info.metadata["name"] == "symphony-yandex-tracker"
+        assert adapter_info.metadata["version"] == "0.1.0"
+        assert adapter_info.metadata["tracker_kind"] == "yandex_tracker"
+        assert adapter_info.metadata["description"] == "Yandex Tracker integration adapter for Symphony orchestration platform"
+        assert adapter_info.metadata["author"] == "py-symphony team"
+
+    # T074: Test tracker.kind="yandex_tracker" instantiates adapter
+    def test_t074_workflow_yaml_with_yandex_tracker_kind_instantiates_adapter(self):
+        """Test T074: Valid tracker.kind="yandex_tracker" in WORKFLOW.md successfully instantiates adapter.
+
+        Test case: When TrackerRegistry discovers yandex_tracker, a workflow config with
+                  tracker.kind='yandex_tracker' can instantiate the adapter
+        Verify: get_adapter returns adapter class that can be instantiated
+        Verify: adapter instance has correct tracker_type
+        """
+        from runtime.tracker.registry import TrackerRegistry
+
+        registry = TrackerRegistry()
+        registry.discover_from_entry_points()
+
+        adapter_info = registry.get_adapter("yandex_tracker")
+        assert adapter_info is not None, "yandex_tracker adapter should be discovered"
+
+        # Verify the adapter class can be instantiated
+        # (we use a test token that will fail auth but prove instantiation works)
+        adapter_class = adapter_info.adapter_class
+        adapter_instance = adapter_class(
+            api_key="y0_test_token_for_instantiation",
+            project_slug="TEST-QUEUE",
+        )
+
+        assert adapter_instance is not None
+        assert adapter_instance.tracker_type == "yandex_tracker"
+        assert isinstance(adapter_instance, adapter_class)
